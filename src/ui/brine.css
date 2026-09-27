@@ -117,6 +117,9 @@
   margin: 0 0 14px;
   text-wrap: pretty;
 }
+.brine-chapter-lede {
+  margin: 10px 0 18px;
+}
 .brine-soft {
   color: var(--brine-soft);
   margin: 0 0 12px;
@@ -266,18 +269,24 @@
 }
 .brine-mic {
   appearance: none;
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   height: 40px;
+  padding: 0 16px 0 14px;
   border-radius: 999px;
-  border: 1px solid var(--brine-line);
-  background: var(--brine-bg);
+  border: 0;
+  background: var(--brine-accent);
+  color: var(--brine-accent-ink);
+  font-weight: 500;
   cursor: pointer;
-  box-shadow: var(--brine-key-shadow);
+  box-shadow: var(--brine-accent-shadow);
 }
-.brine-mic:hover {
-  border-color: var(--brine-soft);
+.brine-mic:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.brine-mic:disabled {
+  opacity: 0.6;
 }
 .brine-rec {
   display: flex;
