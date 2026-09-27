@@ -8,8 +8,8 @@
 // restores it), and leaving a question any way other than Next (Back, the chapter list, another
 // question, closing the tab) saves what is in the box to the server first. A save that cannot
 // reach the server waits in an outbox on the device and is sent when the connection returns. Earlier answers can be
-// opened from the chapter list, edited and saved; the respondent then returns to where they left
-// off, which the server recomputes, so a changed answer that opens a new follow-up asks it.
+// opened from the chapter list and edited; "Back to question n.n" in the header returns to where
+// they left off, which the server recomputes, so a changed answer that opens a follow-up asks it.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import type { Interview, Question } from "../spec"
@@ -120,6 +120,14 @@ async function saveOrQueue(code: string, q: string, body: Record<string, unknown
 
 const paragraphs = (text: string) => text.split(/\n\n+/).map((p, i) => <p key={i} className="brine-lede">{p}</p>)
 
+// A question's number as the chapter index shows it: chapter.question among those that apply.
+function number(view: View, id: string) {
+  const chapters = view.progress.filter((c) => c.total > 0)
+  const ci = chapters.findIndex((c) => c.questions.some((q) => q.id === id))
+  if (ci < 0) return ""
+  return `${ci + 1}.${chapters[ci].questions.findIndex((q) => q.id === id) + 1}`
+}
+
 // theme: "auto" follows the device; "light" or "dark" pins it (for brands with one theme).
 export function Brine({ interview, brand, theme = "auto" }: { interview: Interview; brand: Brand; theme?: "auto" | "light" | "dark" }) {
   const walk = useMemo(() => compile(interview), [interview])
@@ -177,6 +185,17 @@ export function Brine({ interview, brand, theme = "auto" }: { interview: Intervi
           <span>{brand.name}</span>
         </span>
         <span className="brine-grow" />
+        {view && started && view.frontier !== END && (view.session.at !== view.frontier || contents) && (
+          <button
+            type="button"
+            className="brine-key small"
+            onClick={async () => {
+              if (await leave(() => post(code!, "resume"))) setContents(false)
+            }}
+          >
+            Back to question {number(view, view.frontier)}
+          </button>
+        )}
         {view && started && (
           <button
             type="button"
@@ -238,13 +257,6 @@ export function Brine({ interview, brand, theme = "auto" }: { interview: Intervi
       <section>
         <h1>Chapters</h1>
         <p className="brine-lede">Open a chapter to see its questions. Pick one to answer it or change what you said. Everything is saved as you go.</p>
-        {view.frontier !== END && s.at !== view.frontier && (
-          <div className="brine-row">
-            <button type="button" className="brine-key brine-accent" onClick={() => run(post(code!, "resume")).then(() => setContents(false), () => {})}>
-              Continue where you left off →
-            </button>
-          </div>
-        )}
         <Chapters view={view} walk={walk} onOpen={(q) => run(post(code!, "goto", { q })).then(() => setContents(false), () => {})} />
       </section>,
     )
@@ -491,20 +503,18 @@ function Ask({
     input.current?.focus({ preventScroll: true })
   }, [])
 
-  const go = async (how: "next" | "return") => {
+  const go = async () => {
     if (busy || recording) return
     setBusy(true)
     try {
-      if (how === "next") await run(post(code, "answer", { q: s.at, ...payload(latest.current) }))
-      else {
-        if (dirty(latest.current)) await run(saveOrQueue(code, s.at, payload(latest.current)))
-        await run(post(code, "resume"))
-      }
+      await run(post(code, "answer", { q: s.at, ...payload(latest.current) }))
       local.set(draftKey, undefined)
     } catch (e) {
-      // Offline on Next: the answer waits in the outbox (and the box stays as it is).
-      if (e instanceof Offline && how === "next") outbox.add(code, { q: s.at, body: payload(latest.current), at: new Date().toISOString() })
-      if (e instanceof Offline) onQueued()
+      // Offline: the answer waits in the outbox, and the box stays as it is.
+      if (e instanceof Offline) {
+        outbox.add(code, { q: s.at, body: payload(latest.current), at: new Date().toISOString() })
+        onQueued()
+      }
       setBusy(false)
     }
   }
@@ -527,7 +537,7 @@ function Ask({
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && (q.kind !== "long" || e.metaKey || e.ctrlKey) && !e.shiftKey) {
       e.preventDefault()
-      go(revisiting ? "return" : "next")
+      go()
     }
   }
 
@@ -574,23 +584,13 @@ function Ask({
   )
 
   const has = !empty(draft)
-  const changed = dirty(draft)
   const talks = Boolean(q.decide) && draft.voice.length > 0
   const hints = q.hint === undefined ? [] : Array.isArray(q.hint) ? q.hint : [q.hint]
   const pick = (v: string) => setDraft((d) => (q.kind === "multi" ? { ...d, value: toggle(d.value as string[] | undefined, v) } : { ...d, value: d.value === v ? undefined : v }))
 
   return (
     <section className="brine-question">
-      {revisiting && (
-        <p className="brine-revisit">
-          {saved ? "This is an earlier answer. Change anything you like; it's saved when you leave." : "You've skipped ahead to this one."}{" "}
-          {view.frontier !== END && (
-            <button type="button" className="brine-link" disabled={busy || recording} onClick={() => go("return")}>
-              Back to where you left off
-            </button>
-          )}
-        </p>
-      )}
+      {revisiting && <p className="brine-revisit">{saved ? "An earlier answer. Change anything; it's saved when you leave." : "You've skipped ahead to this one."}</p>}
       <h1>{q.ask}</h1>
       {q.context && <p className="brine-context">{q.context}</p>}
 
@@ -639,18 +639,9 @@ function Ask({
       <div className="brine-row">
         <button type="button" className="brine-key" disabled={busy || recording || view.path.length === 0 || view.path[0] === s.at} onClick={back}>← Back</button>
         <span className="brine-grow" />
-        {revisiting ? (
-          <>
-            <button type="button" className="brine-link" disabled={busy || recording} onClick={() => go("next")}>Next question</button>
-            <button type="button" className="brine-key brine-accent" disabled={busy || recording} onClick={() => go("return")}>
-              {busy ? (talks ? "Listening…" : "Saving…") : changed ? "Save and go back →" : "Back to where I was →"}
-            </button>
-          </>
-        ) : (
-          <button type="button" className={`brine-key ${has ? "brine-accent" : ""}`} disabled={busy || recording} onClick={() => go("next")}>
-            {busy ? (talks ? "Listening…" : "Saving…") : has ? "Next →" : "Skip →"}
-          </button>
-        )}
+        <button type="button" className={`brine-key ${has ? "brine-accent" : ""}`} disabled={busy || recording} onClick={() => go()}>
+          {busy ? (talks ? "Listening…" : "Saving…") : has ? "Next →" : "Skip →"}
+        </button>
       </div>
 
       {hints.length > 0 && (
