@@ -26,15 +26,18 @@ function r2() {
   const m = new Map<string, { body: ArrayBuffer; type: string }>()
   return {
     m,
-    async put(k: string, body: ArrayBuffer, o: { httpMetadata: { contentType: string } }) {
-      m.set(k, { body, type: o.httpMetadata.contentType })
+    async put(k: string, body: ArrayBuffer | string, o: { httpMetadata: { contentType: string } }) {
+      m.set(k, { body: typeof body === "string" ? (new TextEncoder().encode(body).buffer as ArrayBuffer) : body, type: o.httpMetadata.contentType })
     },
     async get(k: string) {
       const v = m.get(k)
-      return v ? { body: new Blob([v.body]).stream(), arrayBuffer: async () => v.body } : null
+      return v ? { body: new Blob([v.body]).stream(), arrayBuffer: async () => v.body, text: async () => new TextDecoder().decode(v.body as any) } : null
     },
     async delete(k: string) {
       m.delete(k)
+    },
+    async list({ prefix }: { prefix: string }) {
+      return { objects: [...m.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })), truncated: false }
     },
   }
 }
@@ -128,14 +131,31 @@ describe("worker", () => {
     expect(((await res.json()) as any).session.at).toBe("orders/sources")
   })
 
-  test("a recording not yet part of an answer can be dropped; one that is, stays", async () => {
+  test("removing a recording from the box keeps the audio, marked dropped, in the export", async () => {
     const code = await invite()
     const up = async () => ((await (await req("/api/voice?q=orders/sources", { method: "POST", token: code, body: new Uint8Array([1]), headers: { "content-type": "audio/mp4" } })).json()) as { id: string }).id
     const a = await up()
-    expect((await (await req(`/api/voice/${a}`, { method: "DELETE", token: code })).json()) as object).toEqual({ deleted: true })
-    const b = await up()
-    await req("/api/answer", { method: "POST", token: code, body: JSON.stringify({ q: "orders/sources", value: ["phone"], voice: [b] }) })
-    expect((await (await req(`/api/voice/${b}`, { method: "DELETE", token: code })).json()) as object).toEqual({ kept: true })
+    expect((await (await req(`/api/voice/${a}`, { method: "DELETE", token: code })).json()) as object).toEqual({ dropped: true })
+    expect([...(env.BRINE_AUDIO as any).m.keys()].some((k: string) => k.endsWith(a))).toBeTrue()
+    await req("/api/answer", { method: "POST", token: code, body: JSON.stringify({ q: "orders/sources", value: ["phone"] }) })
+    await Promise.all(waits)
+    const ex = (await (await req("/api/admin/export", { token: "admin" })).json()) as any
+    expect(ex.people[0].dropped.map((r: any) => r.id)).toEqual([a])
+  })
+
+  test("every answer and edit is appended to the log, never overwritten", async () => {
+    const code = await invite()
+    const post = (path: string, body: object) => req(path, { method: "POST", token: code, body: JSON.stringify(body) })
+    await post("/api/answer", { q: "orders/sources", value: ["walkin"] })
+    await post("/api/save", { q: "orders/cutoff", value: "yes" })
+    await post("/api/goto", { q: "orders/sources" })
+    await post("/api/save", { q: "orders/sources", value: ["walkin", "wholesale"] })
+    const log = (await (await req(`/api/admin/log/${code}`, { token: "admin" })).json()) as any[]
+    expect(log.map((e) => [e.kind, e.q, e.answer.value])).toEqual([
+      ["answer", "orders/sources", ["walkin"]],
+      ["save", "orders/cutoff", "yes"],
+      ["save", "orders/sources", ["walkin", "wholesale"]],
+    ])
   })
 
   test("revoking an invite deletes its walk and recordings", async () => {

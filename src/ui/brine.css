@@ -406,6 +406,20 @@
   }
 }
 
+.brine-waiting {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--brine-fg);
+  color: var(--brine-bg);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
 /* the question: question, context, answer, and ways to think about it */
 .brine-context {
   font-size: 1.0625rem;
