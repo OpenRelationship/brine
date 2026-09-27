@@ -138,6 +138,17 @@ describe("worker", () => {
     expect((await (await req(`/api/voice/${b}`, { method: "DELETE", token: code })).json()) as object).toEqual({ kept: true })
   })
 
+  test("revoking an invite deletes its walk and recordings", async () => {
+    const code = await invite()
+    await req("/api/voice?q=orders/sources", { method: "POST", token: code, body: new Uint8Array([1]), headers: { "content-type": "audio/webm" } })
+    await Promise.all(waits)
+    const r = (await (await req(`/api/admin/invite/${code}`, { method: "DELETE", token: "admin" })).json()) as any
+    expect(r.recordings).toBe(1)
+    expect((await req("/api/session", { token: code })).status).toBe(401)
+    expect([...(env.BRINE as any).m.keys()]).toEqual([])
+    expect((env.BRINE_AUDIO as any).m.size).toBe(0)
+  })
+
   test("non-audio is refused", async () => {
     const code = await invite()
     const res = await req("/api/voice?q=orders/sources", { method: "POST", token: code, body: "hi", headers: { "content-type": "text/plain" } })

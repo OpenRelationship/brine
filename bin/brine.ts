@@ -7,6 +7,7 @@
 //   brine status <url>                    who is how far                    (BRINE_ADMIN_TOKEN)
 //   brine export <url> [dir]              answers.json + answers.md         (BRINE_ADMIN_TOKEN)
 //   brine transcribe <url>                retry every recording without a transcript
+//   brine revoke <url> <code>             delete an invite, its answers and its recordings
 //
 // <interview.ts> exports `interview` (or a default). answers.md is what the Gherkin pass reads.
 
@@ -88,8 +89,8 @@ async function main() {
   }
 
   if (cmd === "status") {
-    const rows = await admin(args[0])<{ name: string; answered: number; at: string | null; finished: string | null; created: string }[]>("invites")
-    for (const r of rows) console.log(`${r.name.padEnd(24)} ${String(r.answered).padStart(4)} answered  ${r.finished ? `finished ${r.finished.slice(0, 10)}` : r.at ? `at ${r.at}` : ""}`)
+    const rows = await admin(args[0])<{ code: string; name: string; answered: number; at: string | null; finished: string | null; created: string }[]>("invites")
+    for (const r of rows) console.log(`${r.code}  ${r.name.padEnd(24)} ${String(r.answered).padStart(4)} answered  ${r.finished ? `finished ${r.finished.slice(0, 10)}` : r.at ? `at ${r.at}` : ""}`)
     return
   }
 
@@ -97,6 +98,12 @@ async function main() {
     const rows = await admin(args[0])<{ id: string; ok: boolean; error?: string }[]>("transcribe", { method: "POST", body: "{}" })
     console.log(`${rows.filter((r) => r.ok).length} of ${rows.length} transcribed`)
     for (const r of rows.filter((r) => !r.ok)) console.log(`  ${r.id}: ${r.error}`)
+    return
+  }
+
+  if (cmd === "revoke") {
+    const r = await admin(args[0])<{ revoked: string; recordings: number }>(`invite/${args[1]}`, { method: "DELETE" })
+    console.log(`revoked ${r.revoked}: invite, answers and ${r.recordings} recordings deleted`)
     return
   }
 
@@ -136,7 +143,7 @@ async function main() {
     return
   }
 
-  console.log(`brine check <interview.ts> | outline <interview.ts> | invite <url> <name> | status <url> | export <url> [dir] | transcribe <url>`)
+  console.log(`brine check <interview.ts> | outline <interview.ts> | invite <url> <name> | status <url> | export <url> [dir] | transcribe <url> | revoke <url> <code>`)
   process.exit(cmd ? 2 : 0)
 }
 

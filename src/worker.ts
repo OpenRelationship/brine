@@ -29,6 +29,7 @@
 //   GET  /api/admin/export       every respondent, every asked question, with why, yields, answer, transcripts, decisions
 //   GET  /api/admin/audio/<id>   one recording
 //   POST /api/admin/transcribe   { id? } -> re-run transcription for one or every recording missing a transcript
+//   DELETE /api/admin/invite/<code>  the invite, its walk and its recordings, gone
 
 import type { Interview } from "./spec"
 import { answer, back, begin, compile, END, fallbacks, jump, progress, type Answer, type Session, type Walk } from "./walk"
@@ -315,6 +316,16 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, 
       people.push({ name: i.name, code: i.code, started: s.started, finished: s.finished ?? null, at: s.at === END ? null : s.at, answers: asked })
     }
     return json({ interview: { id: walk.interview.id, title: walk.interview.title, glossary: walk.interview.glossary ?? {} }, exported: new Date().toISOString(), people })
+  }
+
+  const revoke = path.match(/^\/api\/admin\/invite\/([\w-]+)$/)
+  if (revoke && req.method === "DELETE") {
+    const code = revoke[1]
+    if (!(await env.BRINE.get(`invite:${code}`))) return fail(404, "no such invite")
+    const recs = (await all<Recording>(env, "voice:")).filter((r) => r.code === code)
+    await Promise.all(recs.flatMap((r) => [env.BRINE.delete(`voice:${r.id}`), env.BRINE_AUDIO.delete(`audio/${code}/${r.id}`)]))
+    await Promise.all([env.BRINE.delete(`invite:${code}`), env.BRINE.delete(`session:${code}`)])
+    return json({ revoked: code, recordings: recs.length })
   }
 
   const audio = path.match(/^\/api\/admin\/audio\/([\w-]+)$/)
