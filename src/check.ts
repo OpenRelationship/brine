@@ -3,7 +3,7 @@
 // branch value exists, and every question says why it is asked and what it yields.
 
 import type { Condition, Decision, Interview, Question } from "./spec"
-import { answer, begin, compile, END, fallbacks, resolve, type Session, type Walk } from "./walk"
+import { answer, begin, compile, END, fallbacks, replay, resolve, type Session, type Walk } from "./walk"
 
 const KINDS = ["long", "text", "choice", "multi", "number", "scale"]
 
@@ -106,7 +106,7 @@ export function check(interview: Interview, samples = 400): Report {
 
   // Sample walks with random answers and random decisions: how long is a real sitting?
   const lengths: number[] = []
-  if (!errors.length) for (let i = 0; i < samples; i++) lengths.push(sample(walk).path.length)
+  if (!errors.length) for (let i = 0; i < samples; i++) lengths.push(replay(walk, sample(walk)).path.length)
   lengths.sort((a, b) => a - b)
 
   const conditional = (cid: string, q: Question) => Boolean(q.when || interview.chapters.find((c) => c.id === cid)!.when)

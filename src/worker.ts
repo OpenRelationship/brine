@@ -19,8 +19,11 @@
 // Routes. The respondent's bearer token is their invite code.
 //   GET  /api/session            the respondent and their walk (starts one on first visit)
 //   POST /api/answer             { q, value?, note?, voice?, skipped? } -> the walk, moved on
+//   POST /api/save               { q, value?, note?, voice? } -> the walk, answer kept, not moved
 //   POST /api/back               -> the walk, one question back
 //   POST /api/jump               { chapter } -> the walk, at that chapter
+//   POST /api/goto               { q } -> the walk, at that question (to answer or edit it)
+//   POST /api/resume             -> the walk, back where the respondent left off
 //   POST /api/voice?q=<id>       raw audio body -> { id, seconds }
 //   DELETE /api/voice/<id>       drop a recording from an answer draft
 // Admin (bearer BRINE_ADMIN_TOKEN):
@@ -32,7 +35,7 @@
 //   DELETE /api/admin/invite/<code>  the invite, its walk and its recordings, gone
 
 import type { Interview } from "./spec"
-import { answer, back, begin, compile, END, fallbacks, jump, progress, type Answer, type Session, type Walk } from "./walk"
+import { answer, back, save as keep, begin, compile, END, fallbacks, goto, jump, progress, replay, resume, visible, type Answer, type Session, type Walk } from "./walk"
 
 export interface Env {
   BRINE: KVNamespace
@@ -100,43 +103,57 @@ async function load(env: Env, walk: Walk, code: string): Promise<Session> {
 const save = (env: Env, code: string, s: Session) => env.BRINE.put(`session:${code}`, JSON.stringify(s))
 
 async function respondent(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, invite: Invite, path: string, url: URL) {
-  const view = (s: Session) => ({ respondent: invite.name, session: s, progress: progress(walk, s) })
-
-  if (path === "/api/session" && req.method === "GET") {
-    const s = await load(env, walk, invite.code)
+  const view = (s: Session) => ({ respondent: invite.name, session: s, ...replay(walk, s), progress: progress(walk, s) })
+  const body = async () => (await req.json()) as { q?: string; value?: Answer["value"]; note?: string; voice?: string[]; skipped?: boolean; chapter?: string }
+  // The answer as sent, read by Jev when the question asks for decisions.
+  const take = async (q: string, b: Awaited<ReturnType<typeof body>>) => {
+    const a: Omit<Answer, "at"> = b.skipped
+      ? { skipped: true }
+      : { value: clean(b.value), note: b.note?.trim() || undefined, voice: b.voice?.length ? b.voice.slice(0, 20) : undefined }
+    const node = walk.byId.get(q)!
+    const decisions = node.question.decide && !a.skipped ? await decide(env, walk, q, a) : {}
+    if (a.voice?.length) ctx.waitUntil(Promise.all(a.voice.map((id) => transcribe(env, id))))
+    return { a, decisions }
+  }
+  const move = async (fn: (s: Session) => Session) => {
+    const s = fn(await load(env, walk, invite.code))
     await save(env, invite.code, s)
     return json(view(s))
   }
 
+  if (path === "/api/session" && req.method === "GET") return move((s) => s)
+
   if (path === "/api/answer" && req.method === "POST") {
-    const body = (await req.json()) as { q?: string; value?: Answer["value"]; note?: string; voice?: string[]; skipped?: boolean }
+    const b = await body()
     const s = await load(env, walk, invite.code)
-    const q = body.q
-    if (!q || q !== s.at) return json({ ...view(s), stale: true }, 409)
-    const node = walk.byId.get(q)!
-    const a: Omit<Answer, "at"> = body.skipped
-      ? { skipped: true }
-      : { value: clean(body.value), note: body.note?.trim() || undefined, voice: body.voice?.length ? body.voice.slice(0, 20) : undefined }
-    let decisions: Record<string, string> = {}
-    if (node.question.decide && !a.skipped) decisions = await decide(env, walk, q, a)
-    const next = answer(walk, s, q, a, decisions)
+    // Only the question on screen can be answered-and-moved-on; a second tab or a double press
+    // gets the current walk back instead of skipping a question.
+    if (!b.q || b.q !== s.at) return json({ ...view(s), stale: true }, 409)
+    const { a, decisions } = await take(b.q, b)
+    const next = answer(walk, s, b.q, a, decisions)
     await save(env, invite.code, next)
-    // Anything recorded for this answer that is not transcribed yet gets transcribed now.
-    if (a.voice?.length) ctx.waitUntil(Promise.all(a.voice.map((id) => transcribe(env, id))))
     return json(view(next))
   }
 
-  if (path === "/api/back" && req.method === "POST") {
-    const s = back(await load(env, walk, invite.code))
-    await save(env, invite.code, s)
-    return json(view(s))
+  if (path === "/api/save" && req.method === "POST") {
+    const b = await body()
+    const s = await load(env, walk, invite.code)
+    if (!b.q || !walk.byId.has(b.q) || !visible(walk, b.q, s)) return json({ ...view(s), stale: true }, 409)
+    const { a, decisions } = await take(b.q, b)
+    const next = keep(walk, s, b.q, a, decisions)
+    await save(env, invite.code, next)
+    return json(view(next))
   }
 
+  if (path === "/api/back" && req.method === "POST") return move((s) => back(walk, s))
+  if (path === "/api/resume" && req.method === "POST") return move((s) => resume(walk, s))
   if (path === "/api/jump" && req.method === "POST") {
-    const { chapter } = (await req.json()) as { chapter: string }
-    const s = jump(walk, await load(env, walk, invite.code), chapter)
-    await save(env, invite.code, s)
-    return json(view(s))
+    const { chapter } = await body()
+    return move((s) => jump(walk, s, chapter ?? ""))
+  }
+  if (path === "/api/goto" && req.method === "POST") {
+    const { q } = await body()
+    return move((s) => (q && walk.byId.has(q) ? goto(walk, s, q) : s))
   }
 
   if (path === "/api/voice" && req.method === "POST") {
@@ -279,7 +296,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, 
     const rows = await Promise.all(
       invites.map(async (i) => {
         const s = await env.BRINE.get<Session>(`session:${i.code}`, "json")
-        return { name: i.name, code: i.code, created: i.created, answered: s ? Object.keys(s.answers).length : 0, at: s?.at ?? null, finished: s?.finished ?? null }
+        return { name: i.name, code: i.code, created: i.created, answered: s ? Object.keys(s.answers).length : 0, at: s ? replay(walk, s).frontier : null, finished: s?.finished ?? null }
       }),
     )
     return json(rows)
@@ -299,6 +316,8 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, 
         const recordings = await Promise.all((a.voice ?? []).map((v) => env.BRINE.get<Recording>(`voice:${v}`, "json")))
         asked.push({
           id,
+          // false when a later edit took the walk down another branch: kept, but superseded
+          applies: visible(walk, id, s),
           chapter: n.chapter.title,
           ask: n.question.ask,
           kind: n.question.kind,
@@ -313,7 +332,8 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, 
           at: a.at,
         })
       }
-      people.push({ name: i.name, code: i.code, started: s.started, finished: s.finished ?? null, at: s.at === END ? null : s.at, answers: asked })
+      const { frontier } = replay(walk, s)
+      people.push({ name: i.name, code: i.code, started: s.started, finished: s.finished ?? null, leftOff: frontier === END ? null : frontier, answers: asked })
     }
     return json({ interview: { id: walk.interview.id, title: walk.interview.title, glossary: walk.interview.glossary ?? {} }, exported: new Date().toISOString(), people })
   }

@@ -1,6 +1,12 @@
 // Walking an interview: resolve every address to an absolute "chapter/question" id, then step
 // from one question to the next given the answers so far. Pure functions, shared by the browser,
 // the Worker and the CLI.
+//
+// A session stores only the answers, the decisions on them, and the question on screen. The path
+// (what was asked, in order) and the frontier (the first question not yet answered) are replayed
+// from the answers every time. So an edit anywhere is safe: change an early gate and the replay
+// takes the new branch, stops at the first follow-up it opened, and keeps every answer that still
+// applies. Answers that no longer apply are kept, not deleted, and `visible` says so.
 
 import { END, type Chapter, type Condition, type Interview, type Question, type Target } from "./spec"
 
@@ -15,8 +21,7 @@ export interface Answer {
 }
 
 export interface Session {
-  at: string // the question being asked, or END
-  path: string[] // the questions asked before it, oldest first, for Back
+  at: string // the question on screen, or END
   answers: Record<string, Answer>
   decisions: Record<string, string> // "chapter/question.key" -> result
   started: string
@@ -113,47 +118,97 @@ export function step(walk: Walk, id: string, s: Pick<Session, "answers" | "decis
 }
 
 export function begin(walk: Walk, now = new Date().toISOString()): Session {
-  const s: Session = { at: END, path: [], answers: {}, decisions: {}, started: now }
+  const s: Session = { at: END, answers: {}, decisions: {}, started: now }
   s.at = settle(walk, walk.first, s)
   return s
 }
 
-// Record an answer and move on. Decisions for this question are passed in by key ("exception") (the Worker asks the
-// model; offline they are the fallbacks). Answers further along that no longer apply are kept:
-// if the respondent comes back to them, their earlier words are still there.
-export function answer(walk: Walk, s: Session, id: string, a: Omit<Answer, "at">, decisions: Record<string, string> = {}, now = new Date().toISOString()): Session {
-  const answers = { ...s.answers, [id]: { ...a, at: now } }
+// The walk as the answers now stand: every answered (or skipped) question reached from the start,
+// in order, and the first one reached that has no answer yet (END when there is none).
+export function replay(walk: Walk, s: Pick<Session, "answers" | "decisions">): { path: string[]; frontier: string } {
+  const path: string[] = []
+  let id = settle(walk, walk.first, s)
+  while (id !== END && s.answers[id] && path.length <= walk.nodes.length) {
+    path.push(id)
+    id = step(walk, id, s)
+  }
+  return { path, frontier: id }
+}
+
+function put(s: Session, id: string, a: Omit<Answer, "at">, decisions: Record<string, string>, now: string): Session {
   const kept = Object.fromEntries(Object.entries(s.decisions).filter(([k]) => !k.startsWith(`${id}.`)))
   const mine = Object.fromEntries(Object.entries(decisions).map(([k, v]) => [`${id}.${k}`, v]))
-  const next: Session = { ...s, answers, decisions: { ...kept, ...mine } }
-  next.path = [...s.path, id]
+  return { ...s, answers: { ...s.answers, [id]: { ...a, at: now } }, decisions: { ...kept, ...mine } }
+}
+
+function finish(walk: Walk, s: Session, now: string): Session {
+  const { frontier } = replay(walk, s)
+  return frontier === END ? { ...s, finished: s.finished ?? now } : { ...s, finished: undefined }
+}
+
+// Answer the question on screen and go on to the next one along the walk. Decisions are passed in
+// by key ("exception"); the Worker asks the model, and offline they are the fallbacks. The next
+// question may already be answered (when revisiting); it opens with that answer filled in.
+export function answer(walk: Walk, s: Session, id: string, a: Omit<Answer, "at">, decisions: Record<string, string> = {}, now = new Date().toISOString()): Session {
+  const next = put(s, id, a, decisions, now)
   next.at = step(walk, id, next)
-  if (next.at === END && !next.finished) next.finished = now
-  return next
+  return finish(walk, next, now)
 }
 
-export function back(s: Session): Session {
-  if (!s.path.length) return s
-  return { ...s, at: s.path[s.path.length - 1], path: s.path.slice(0, -1) }
+// Keep an answer without moving: what is in the box when the respondent leaves a question by
+// Back, the chapter list, or another question.
+export function save(walk: Walk, s: Session, id: string, a: Omit<Answer, "at">, decisions: Record<string, string> = {}, now = new Date().toISOString()): Session {
+  return finish(walk, put(s, id, a, decisions, now), now)
 }
 
-// Jump to a chapter: its first visible question, or the chapter after it if none apply.
+// Back: the question before this one on the walk.
+export function back(walk: Walk, s: Session): Session {
+  const { path, frontier } = replay(walk, s)
+  const i = path.indexOf(s.at)
+  if (i > 0) return { ...s, at: path[i - 1] }
+  if (i === 0) return s
+  if (s.at === frontier || s.at === END) return path.length ? { ...s, at: path[path.length - 1] } : s
+  // Off the walk (visiting a chapter ahead): the nearest walked question before it.
+  const here = walk.byId.get(s.at)?.index ?? Infinity
+  const before = path.filter((p) => walk.byId.get(p)!.index < here)
+  return before.length ? { ...s, at: before[before.length - 1] } : s
+}
+
+// Open any question that applies now, to answer or edit it.
+export function goto(walk: Walk, s: Session, id: string): Session {
+  return id === END || visible(walk, id, s) ? { ...s, at: id } : s
+}
+
+// Back to where the respondent left off.
+export function resume(walk: Walk, s: Session): Session {
+  return { ...s, at: replay(walk, s).frontier }
+}
+
+// Jump to a chapter: its first question on the walk, else its first question that applies.
 export function jump(walk: Walk, s: Session, chapterId: string): Session {
   const c = walk.interview.chapters.find((c) => c.id === chapterId)
   if (!c?.questions[0]) return s
-  const to = settle(walk, `${c.id}/${c.questions[0].id}`, s)
-  if (to === s.at) return s
-  return { ...s, at: to, path: s.at === END ? s.path : [...s.path, s.at] }
+  const { path, frontier } = replay(walk, s)
+  const walked = [...path, frontier].find((id) => id.startsWith(`${c.id}/`))
+  return { ...s, at: walked ?? settle(walk, `${c.id}/${c.questions[0].id}`, s) }
 }
 
 export function fallbacks(q: Question): Record<string, string> {
   return Object.fromEntries(Object.entries(q.decide ?? {}).map(([k, d]) => [k, d.fallback]))
 }
 
-// Progress by chapter: questions that currently apply, and how many of those are answered.
+// Progress by chapter: the questions that currently apply, in order, with what each has.
+export type Status = "answered" | "skipped" | "open"
 export function progress(walk: Walk, s: Session) {
   return walk.interview.chapters.map((c) => {
-    const ids = c.questions.map((q) => `${c.id}/${q.id}`).filter((id) => visible(walk, id, s))
-    return { id: c.id, title: c.title, part: c.part, total: ids.length, answered: ids.filter((id) => s.answers[id]).length }
+    const questions = c.questions
+      .map((q) => `${c.id}/${q.id}`)
+      .filter((id) => visible(walk, id, s))
+      .map((id) => {
+        const a = s.answers[id]
+        const status: Status = !a ? "open" : a.skipped ? "skipped" : "answered"
+        return { id, ask: walk.byId.get(id)!.question.ask, status, voice: a?.voice?.length ?? 0 }
+      })
+    return { id: c.id, title: c.title, part: c.part, total: questions.length, answered: questions.filter((q) => q.status !== "open").length, questions }
   })
 }

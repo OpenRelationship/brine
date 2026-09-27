@@ -63,6 +63,21 @@ Use choice, multi, number and scale questions as gates: facts that decide which 
 (buy or lease, ever ships a car, has ever refunded). Give a gate `note: true` when the qualifier
 matters ("mostly, except…").
 
+## What the respondent sees
+
+Each question is three things and nothing else:
+
+- **`ask`**: one question. Never two joined by "and"; move the second part to the hints.
+- **`context`**: one or two sentences under it that set the scene: where we are in the process and
+  what "it" and "they" refer to. Write it so the question makes sense read cold, by someone who
+  jumped straight to it from the chapter list. A follow-up restates what triggered it ("You said
+  it sometimes goes differently.").
+- **`hint`**: two to four short prompts at the bottom, "Ways to think about it": angles, what a
+  useful answer covers, the kind of example we mean. Never a suggested answer, never leading.
+
+A question without context is the most common failure: the designer knows why it is asked, and
+the respondent has to guess.
+
 Never ask about software, screens, features, wishes or efficiency. Never use the designer's jargon
 (Gherkin, edge case, workflow, ontology). Keep asks short, in the second person, in the respondent's
 words.

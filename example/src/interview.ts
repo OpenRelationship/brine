@@ -15,7 +15,7 @@ export const interview: Interview = {
   respondent: "Sam",
   welcome: {
     heading: "Hi {name}. Tell us how the mornings really go.",
-    body: "Answer in your own words. Press the waveform to talk instead of typing.\n\nSkip anything. Stop and come back any time; your answers are kept.",
+    body: "Answer in your own words. Press Talk to answer out loud instead of typing.\n\nSkip anything. Stop and come back any time; your answers are kept.",
   },
   farewell: { heading: "Thank you, {name}.", body: "That's everything. We'll turn this into a written description and send it back for you to correct." },
   glossary: { bake: "One oven load, planned the night before" },
@@ -31,7 +31,9 @@ export const interview: Interview = {
           why: "Which intake channels exist; each becomes its own path.", yields: "Feature: Taking orders — Background: the channels",
         },
         {
-          id: "wholesale", kind: "long", ask: "Walk me through the last wholesale order, from the call to the van leaving.",
+          id: "wholesale", kind: "long", ask: "Walk me through the last wholesale order.",
+          context: "A café or shop that orders from you regularly. Start from when they got in touch and end when the van left.",
+          hint: ["Who took the order, and how", "What had to be baked differently", "Anything that went wrong on the way"],
           when: { q: "sources", is: "wholesale" }, decide: { exception },
           why: "The wholesale path end to end, in order, from a real instance.", yields: "Scenario: a wholesale order — Given/When/Then",
         },
@@ -55,7 +57,7 @@ export const interview: Interview = {
       id: "bake",
       title: "The bake",
       questions: [
-        { id: "plan", kind: "long", ask: "How do you decide how much of each thing to bake?", hint: "What you look at, and in what order.", why: "The planning rule and its inputs.", yields: "Rule: bake planning" },
+        { id: "plan", kind: "long", ask: "How do you decide how much of each thing to bake?", context: "The night before, when tomorrow's bake gets planned.", hint: ["What you look at first", "Days or seasons that change the numbers"], why: "The planning rule and its inputs.", yields: "Rule: bake planning" },
         { id: "waste", kind: "number", unit: "loaves a day", ask: "On a normal day, how many loaves go unsold?", why: "Baseline for the planning rule.", yields: "Example: waste" },
         { id: "busy", kind: "scale", scale: ["Calm", "Busy", "Slammed"], ask: "How does a Saturday feel?", note: true, why: "Load that stresses the process.", yields: "Background: load" },
       ],

@@ -54,7 +54,12 @@ export interface Question {
   id: string
   kind: Kind
   ask: string
-  hint?: string
+  // Shown under the question: one or two plain sentences that set the scene (where we are in the
+  // process, what "this" refers to) so the question makes sense on its own.
+  context?: string
+  // Shown at the bottom as "Ways to think about it": prompts for when the answer isn't top of
+  // mind (what a good answer might cover, angles, examples). Never the answer itself.
+  hint?: string | string[]
   options?: Option[] // choice, multi
   scale?: string[] //   scale: labels from low to high; the answer is the index as a string
   unit?: string //      number

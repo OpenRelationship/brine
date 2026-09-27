@@ -19,7 +19,7 @@ The repo lives at `~/brine` (github.com/shinyobjectz/brine). Read `references/me
 
 1. **Frame.** Ask the user who the respondent is, what the answers are for, and what the vocabulary is (an ontology, a glossary, a pipeline, a brief). Read the sources. If the host repo has a vocabulary tool (e.g. `monty onto check`), use the repo's words in `why` and `yields`.
 2. **Plan the chapters** from the process, in the order work flows (`references/method.md`, "Chapters"). Show the user the chapter list with a question budget per chapter before writing questions.
-3. **Write the tree** as a TypeScript module exporting `interview: Interview` (see `example/src/interview.ts`). Every question has `why` (the indirect aim) and `yields` (its Gherkin target). Use the question patterns in the method.
+3. **Write the tree** as a TypeScript module exporting `interview: Interview` (see `example/src/interview.ts`). Every question has `ask`, `context` (the scene, shown under it) and usually `hint` (ways to think about it, shown at the bottom), plus the designer-only `why` (the indirect aim) and `yields` (its Gherkin target). Use the question patterns in the method.
 4. **Check it**: `bun ~/brine/bin/brine.ts check <file>` must print no errors. Read the sampled walk length; for one sitting keep the median under ~60, and for a deep process interview meant for several sittings 150–220 is fine. `brine outline <file>` prints the tree for the user to review.
 5. **Host it.** Mount the Worker and the page (see "Hosting"), create the KV namespace and R2 bucket, set `OPENROUTER_API_KEY` and `BRINE_ADMIN_TOKEN`, and deploy with wrangler.
 6. **Invite**: `BRINE_ADMIN_TOKEN=… bun ~/brine/bin/brine.ts invite <url> "<Name>"` prints the link to send. `brine status <url>` shows progress.
@@ -54,5 +54,5 @@ Models are vars: `BRINE_STT_MODEL` (default `openai/gpt-4o-mini-transcribe`; `op
 - Never show the respondent the reasons, the branches or the Gherkin.
 - A decision's `fallback` is the result that asks more. A missing model may cost a question; it must never lose an edge case.
 - Jumps go forward only; `check` enforces it so every walk ends.
-- Keep answers where they are: going back and changing an answer keeps later answers, and guards decide what is shown.
+- Answers are never lost. The page saves the box whenever the respondent leaves a question, and the server replays the walk from the answers, so editing an early answer takes the new branch, asks any follow-up it opened, and keeps every other answer. Answers on a branch that no longer applies stay in the export with `applies: false`.
 - Treat transcripts as the respondent's words: quote them, don't paraphrase them into rules they didn't state.
