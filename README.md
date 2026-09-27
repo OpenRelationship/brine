@@ -1,0 +1,106 @@
+# brine
+
+Interviews in, Gherkin out.
+
+brine is a question tree you send to someone who knows a process better than anyone, and can't
+describe it. They answer one question at a time, typed or spoken. Their recordings are transcribed on
+the server, a decision model reads each free answer to choose which follow-up to ask, and the
+answers come back as a bundle that Claude turns into `.feature` files.
+
+- **The tree** (`src/spec.ts`, `src/walk.ts`). Chapters of questions, walked in order. `when` guards
+  skip what does not apply, `next` jumps go forward, and `decide` asks
+  [Jev](https://openrouter.ai/typesafe/jev-1.13) typed questions about an answer ("does this name an
+  exception?", "who caused the delay?") so later guards branch on what was said. `brine check`
+  proves every address resolves, every jump goes forward and every guard looks back, and it samples
+  walks to tell you how long a sitting is.
+- **The page** (`src/ui`). One question at a time with a chapter list to jump around, and a waveform
+  button in the answer box that records. The respondent never sees transcripts, reasons, branches or
+  Gherkin.
+- **The Worker** (`src/worker.ts`). A dependency-free Cloudflare Worker: invite links, the walk in
+  KV, recordings in R2, transcription through OpenRouter's speech-to-text endpoint
+  (`openai/gpt-4o-mini-transcribe` by default), decisions through OpenRouter's Decisions API, and an
+  admin export.
+- **The skill** (`skills/brine`). A Claude Code skill: how to design the questions from a vocabulary
+  or pipeline (`references/method.md`), and how to write Gherkin from the answers
+  (`references/gherkin.md`).
+
+## Use it
+
+```sh
+bun install
+bun test                                    # the walk, the checker, the Worker
+bun bin/brine.ts check example/src/interview.ts
+bun bin/brine.ts outline example/src/interview.ts
+```
+
+Install the skill for Claude Code:
+
+```sh
+ln -s ~/brine/skills/brine ~/.claude/skills/brine
+```
+
+Then ask Claude to "design a brine interview for <who> about <what>".
+
+### Host an interview
+
+Write `questions.ts` exporting `interview: Interview`, then:
+
+```ts
+// worker.ts
+import { brine } from "brine/worker"
+import { interview } from "./questions"
+export default brine(interview)
+```
+
+```tsx
+// main.tsx
+import { Brine } from "brine/ui"
+import "brine/ui/brine.css"
+createRoot(document.getElementById("root")!).render(<Brine interview={interview} brand={{ name: "Acme" }} />)
+```
+
+`example/` is a complete app. It needs a KV namespace (`BRINE`), an R2 bucket (`BRINE_AUDIO`), and
+two secrets: `OPENROUTER_API_KEY` and `BRINE_ADMIN_TOKEN`.
+
+```sh
+wrangler kv namespace create BRINE           # put the id in wrangler.jsonc
+wrangler r2 bucket create brine-example-audio
+wrangler secret put OPENROUTER_API_KEY
+wrangler secret put BRINE_ADMIN_TOKEN
+bun run example:build && wrangler deploy --config example/wrangler.jsonc
+```
+
+### Run it
+
+```sh
+export BRINE_ADMIN_TOKEN=…
+bun bin/brine.ts invite https://your.worker.dev "Sam Baker"   # prints the link to send
+bun bin/brine.ts status https://your.worker.dev
+bun bin/brine.ts export https://your.worker.dev ./answers      # answers.json + answers.md
+```
+
+`answers.md` lists every asked question with its `why` and `yields`, the answer, verbatim
+transcripts and Jev's reads. Hand it to Claude with the skill loaded and ask for the features.
+
+## The spec in one screen
+
+```ts
+{
+  id: "wholesale", kind: "long",
+  ask: "Walk me through the last wholesale order, from the call to the van leaving.",
+  when: { q: "sources", is: "wholesale" },            // only if they take wholesale
+  decide: { exception },                              // Jev: does the answer name an exception?
+  why: "The wholesale path end to end, from a real instance.",   // designer only
+  yields: "Scenario: a wholesale order — Given/When/Then",      // designer only
+},
+{
+  id: "wholesale_exception", kind: "long",
+  ask: "You mentioned it sometimes goes differently. Tell me about the last time it did.",
+  when: { q: "wholesale", decision: "exception", is: "yes" },
+  why: "…", yields: "Scenario: wholesale exception",
+}
+```
+
+Kinds: `long`, `text`, `choice`, `multi`, `number`, `scale`. Guards: `is`, `not`, `answered`,
+`atLeast`, `decision`, and `all` / `any` / `none`. A decision's `fallback` is used when there is no
+model, so pick the result that asks more.

@@ -1,0 +1,11 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "brine-example",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-01",
+  "assets": { "directory": "./dist", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
+  // Create these once: wrangler kv namespace create BRINE; wrangler r2 bucket create brine-example-audio
+  "kv_namespaces": [{ "binding": "BRINE", "id": "REPLACE_ME" }],
+  "r2_buckets": [{ "binding": "BRINE_AUDIO", "bucket_name": "brine-example-audio" }]
+  // Secrets: wrangler secret put OPENROUTER_API_KEY; wrangler secret put BRINE_ADMIN_TOKEN
+}

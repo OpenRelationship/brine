@@ -1,0 +1,447 @@
+/*
+  brine's look. Everything that says "whose brand is this" is a custom property; a host sets them
+  on :root (or .brine) after importing this file. Defaults are a quiet neutral in both themes.
+*/
+
+.brine {
+  --brine-bg: #ffffff;
+  --brine-fg: #111318;
+  --brine-soft: #5a6170;
+  --brine-line: #e4e6ea;
+  --brine-well: #f6f7f9;
+  --brine-accent: #111318;
+  --brine-accent-ink: #ffffff;
+  --brine-on: #eef0f3;
+  --brine-rec: #e5484d;
+  --brine-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --brine-display: var(--brine-font);
+  --brine-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --brine-radius: 12px;
+  --brine-key-shadow: 0 1px 0 0 rgb(0 0 0 / 0.06);
+  --brine-key-press: inset 0 1px 2px 0 rgb(0 0 0 / 0.1);
+  --brine-accent-shadow: var(--brine-key-shadow);
+  --brine-plate-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+}
+@media (prefers-color-scheme: dark) {
+  .brine:not([data-theme="light"]) {
+    --brine-bg: #0e1013;
+    --brine-fg: #eceef2;
+    --brine-soft: #9aa1ae;
+    --brine-line: #262a31;
+    --brine-well: #16191e;
+    --brine-accent: #eceef2;
+    --brine-accent-ink: #0e1013;
+    --brine-on: #1d2127;
+  }
+}
+
+.brine {
+  min-height: 100dvh;
+  background: var(--brine-bg);
+  color: var(--brine-fg);
+  font-family: var(--brine-font);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.brine *,
+.brine *::before,
+.brine *::after {
+  box-sizing: border-box;
+}
+.brine button {
+  font: inherit;
+  color: inherit;
+}
+
+.brine-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: color-mix(in srgb, var(--brine-bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--brine-line);
+}
+.brine-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--brine-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.brine-brand img,
+.brine-brand svg {
+  height: 26px;
+  width: auto;
+}
+
+.brine-column {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 48px 20px 96px;
+}
+@media (max-width: 560px) {
+  .brine-column {
+    padding: 28px 16px 72px;
+  }
+}
+
+.brine h1 {
+  font-family: var(--brine-display);
+  font-weight: 600;
+  font-size: clamp(1.45rem, 1.2rem + 1.1vw, 2rem);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  margin: 6px 0 14px;
+  text-wrap: pretty;
+}
+.brine-lede {
+  font-size: 1.0625rem;
+  color: var(--brine-soft);
+  margin: 0 0 14px;
+  text-wrap: pretty;
+}
+.brine-soft {
+  color: var(--brine-soft);
+  margin: 0 0 12px;
+}
+.brine-label {
+  font-family: var(--brine-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brine-soft);
+  margin: 0;
+}
+.brine-error {
+  color: var(--brine-rec);
+  margin: 12px 0 0;
+}
+.brine-grow {
+  flex: 1;
+}
+.brine-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.brine-num {
+  font-family: var(--brine-mono);
+  font-size: 0.72rem;
+  color: var(--brine-soft);
+  min-width: 1.4em;
+}
+
+/* keys */
+.brine-key {
+  appearance: none;
+  border: 1px solid var(--brine-line);
+  background: var(--brine-bg);
+  border-radius: var(--brine-radius);
+  padding: 10px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--brine-key-shadow);
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+.brine-key:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: var(--brine-key-press);
+}
+.brine-key:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.brine-key.brine-accent {
+  background: var(--brine-accent);
+  color: var(--brine-accent-ink);
+  border-color: transparent;
+  box-shadow: var(--brine-accent-shadow);
+}
+.brine-key.small {
+  padding: 6px 12px;
+  font-size: 0.875rem;
+}
+.brine-link {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 4px 2px;
+  color: var(--brine-soft);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.brine-link:hover {
+  color: var(--brine-fg);
+}
+.brine-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  text-decoration: none;
+}
+.brine :focus-visible {
+  outline: 2px solid var(--brine-fg);
+  outline-offset: 2px;
+}
+
+/* progress */
+.brine-ticks {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 22px;
+}
+.brine-ticks span {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--brine-line);
+}
+.brine-ticks span.done {
+  background: var(--brine-soft);
+}
+.brine-ticks span.now {
+  background: var(--brine-accent);
+}
+
+/* the answer box, with the recorder in its foot */
+.brine-box {
+  margin-top: 18px;
+  border: 1px solid var(--brine-line);
+  border-radius: var(--brine-radius);
+  background: var(--brine-well);
+  transition: border-color 120ms ease;
+}
+.brine-box:focus-within {
+  border-color: var(--brine-soft);
+}
+.brine-box.recording {
+  border-color: var(--brine-rec);
+}
+.brine-box textarea {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  resize: vertical;
+  padding: 14px 16px 6px;
+  font: inherit;
+  color: inherit;
+  min-height: 7.5em;
+}
+.brine-box textarea:focus {
+  outline: none;
+}
+.brine-box textarea::placeholder {
+  color: var(--brine-soft);
+  opacity: 0.8;
+}
+.brine-box-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 8px 8px 12px;
+  min-height: 48px;
+}
+.brine-mic {
+  appearance: none;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--brine-line);
+  background: var(--brine-bg);
+  cursor: pointer;
+  box-shadow: var(--brine-key-shadow);
+}
+.brine-mic:hover {
+  border-color: var(--brine-soft);
+}
+.brine-rec {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 100%;
+  min-height: 40px;
+}
+.brine-rec .brine-soft {
+  margin: 0;
+}
+.brine-rec.live {
+  color: var(--brine-rec);
+}
+.brine-rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--brine-rec);
+  animation: brine-pulse 1.2s ease-in-out infinite;
+  flex: none;
+}
+@keyframes brine-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brine-rec-dot {
+    animation: none;
+  }
+}
+.brine-rec-wave {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  color: var(--brine-rec);
+}
+.brine-rec-time {
+  font-family: var(--brine-mono);
+  font-size: 0.8rem;
+  color: var(--brine-fg);
+  font-variant-numeric: tabular-nums;
+}
+.brine-chip-voice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 999px;
+  background: var(--brine-bg);
+  border: 1px solid var(--brine-line);
+  font-size: 0.8125rem;
+}
+.brine-chip-voice button {
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--brine-soft);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+/* inputs */
+.brine-well {
+  width: 100%;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--brine-line);
+  border-radius: var(--brine-radius);
+  background: var(--brine-well);
+  font: inherit;
+  color: inherit;
+}
+.brine-number {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brine-number .brine-well {
+  max-width: 200px;
+}
+.brine-number .brine-soft {
+  margin: 18px 0 0;
+}
+
+.brine-choices,
+.brine-scale {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+.brine-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.brine-option {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--brine-line);
+  border-radius: var(--brine-radius);
+  background: var(--brine-bg);
+  cursor: pointer;
+  box-shadow: var(--brine-plate-shadow);
+}
+.brine-chips .brine-option {
+  padding: 8px 14px;
+  border-radius: 999px;
+}
+.brine-option:hover {
+  border-color: var(--brine-soft);
+}
+.brine-option.on {
+  background: var(--brine-on);
+  border-color: var(--brine-fg);
+}
+
+.brine-hint-key {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .brine-hint-key {
+    display: inline;
+  }
+}
+
+/* chapters */
+.brine-chapters {
+  margin: 22px 0 0;
+}
+.brine-chapters ol {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  border-top: 1px solid var(--brine-line);
+}
+.brine-part {
+  font-family: var(--brine-display);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  margin: 0 0 8px;
+}
+.brine-chapters li > * {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--brine-line);
+  background: none;
+  text-align: left;
+}
+.brine-chapters li button {
+  cursor: pointer;
+}
+.brine-chapters li button:hover {
+  background: var(--brine-well);
+}
+.brine-chapters li.here > * {
+  font-weight: 600;
+}
+.brine-chapters li.done .brine-grow {
+  color: var(--brine-soft);
+}
+
+.brine-welcome h1 {
+  font-size: clamp(1.8rem, 1.3rem + 2vw, 2.6rem);
+}
