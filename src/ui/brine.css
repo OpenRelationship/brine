@@ -47,6 +47,8 @@
 
 .brine {
   min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   background: var(--brine-bg);
   color: var(--brine-fg);
   font-family: var(--brine-font);
@@ -72,9 +74,7 @@
   align-items: center;
   gap: 12px;
   padding: 14px 20px;
-  background: color-mix(in srgb, var(--brine-bg) 88%, transparent);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--brine-line);
+  background: var(--brine-bg);
 }
 .brine-brand {
   display: inline-flex;
@@ -91,14 +91,18 @@
 }
 
 .brine-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
   width: 100%;
-  max-width: 680px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 48px 20px 96px;
+  padding: 24px 20px 12vh;
 }
 @media (max-width: 560px) {
   .brine-column {
-    padding: 28px 16px 72px;
+    padding: 16px 16px 8vh;
   }
 }
 
@@ -206,25 +210,6 @@
 .brine :focus-visible {
   outline: 2px solid var(--brine-fg);
   outline-offset: 2px;
-}
-
-/* progress */
-.brine-ticks {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 22px;
-}
-.brine-ticks span {
-  flex: 1;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--brine-line);
-}
-.brine-ticks span.done {
-  background: var(--brine-soft);
-}
-.brine-ticks span.now {
-  background: var(--brine-accent);
 }
 
 /* the answer box, with the recorder in its foot */
@@ -421,43 +406,95 @@
   }
 }
 
+/* the question: question, context, answer, and ways to think about it */
+.brine-context {
+  font-size: 1.0625rem;
+  color: var(--brine-soft);
+  margin: 0 0 6px;
+  text-wrap: pretty;
+}
+.brine-revisit {
+  font-size: 0.875rem;
+  color: var(--brine-soft);
+  margin: 0 0 18px;
+}
+.brine-hints {
+  margin-top: 40px;
+  color: var(--brine-soft);
+  font-size: 0.9375rem;
+}
+.brine-hints p {
+  margin: 0 0 6px;
+  font-weight: 500;
+  color: var(--brine-fg);
+}
+.brine-hints ul {
+  margin: 0;
+  padding-left: 1.1em;
+}
+.brine-hints li {
+  margin: 4px 0;
+}
+.brine-unit {
+  color: var(--brine-soft);
+  margin-top: 18px;
+}
+
 /* chapters */
 .brine-chapters {
-  margin: 22px 0 0;
+  margin: 28px 0 0;
 }
-.brine-chapters ol {
+.brine-chapters ul {
   list-style: none;
-  margin: 0 0 18px;
+  margin: 0 0 22px;
   padding: 0;
-  border-top: 1px solid var(--brine-line);
 }
 .brine-part {
   font-family: var(--brine-display);
   font-weight: 600;
-  font-size: 0.9375rem;
-  margin: 0 0 8px;
+  margin: 0 0 6px;
 }
-.brine-chapters li > * {
+.brine-chapter,
+.brine-questions button {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 12px;
   width: 100%;
-  padding: 11px 4px;
+  padding: 8px 10px;
+  margin: 0 -10px;
   border: 0;
-  border-bottom: 1px solid var(--brine-line);
+  border-radius: var(--brine-radius);
   background: none;
   text-align: left;
 }
-.brine-chapters li button {
+.brine-chapters button {
   cursor: pointer;
 }
-.brine-chapters li button:hover {
+.brine-chapters button:hover {
   background: var(--brine-well);
 }
-.brine-chapters li.here > * {
+.brine-chapters li.here > .brine-chapter {
   font-weight: 600;
 }
-.brine-chapters li.done .brine-grow {
+.brine-chapters li.done > .brine-chapter .brine-grow {
+  color: var(--brine-soft);
+}
+.brine-count {
+  font-size: 0.8125rem;
+  color: var(--brine-soft);
+  white-space: nowrap;
+}
+.brine-questions {
+  margin: 2px 0 10px !important;
+  padding-left: 14px !important;
+}
+.brine-questions button {
+  font-size: 0.9375rem;
+}
+.brine-questions button.here {
+  background: var(--brine-on);
+}
+.brine-questions button.open .brine-grow {
   color: var(--brine-soft);
 }
 

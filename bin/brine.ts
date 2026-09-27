@@ -70,6 +70,8 @@ async function main() {
       if (c.when) out.push(`_only when ${describe(c.when)}_`, "")
       c.questions.forEach((q, qi) => {
         out.push(`${qi + 1}. **${q.ask}** \`${q.id}\` · ${q.kind}${q.when ? ` · _when ${describe(q.when)}_` : ""}`)
+        if (q.context) out.push(`   - context: ${q.context}`)
+        if (q.hint) out.push(`   - ways to think about it: ${[q.hint].flat().join(" · ")}`)
         if (q.options) out.push(`   - options: ${q.options.map((o) => `${o.label}${o.next ? ` → ${o.next}` : ""}`).join(" · ")}`)
         if (q.scale) out.push(`   - scale: ${q.scale.join(" · ")}`)
         if (q.decide) out.push(`   - Jev: ${Object.entries(q.decide).map(([k, d]) => `${k} (${d.type})`).join(", ")}`)

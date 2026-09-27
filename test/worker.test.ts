@@ -149,6 +149,30 @@ describe("worker", () => {
     expect((env.BRINE_AUDIO as any).m.size).toBe(0)
   })
 
+  test("save keeps an answer without moving; goto and resume move around the walk", async () => {
+    const code = await invite()
+    const post = async (path: string, body: object) => (await (await req(path, { method: "POST", token: code, body: JSON.stringify(body) })).json()) as any
+    let r = await post("/api/answer", { q: "orders/sources", value: ["walkin"] })
+    expect(r.session.at).toBe("orders/cutoff")
+    // Leave the question half-typed: it is saved, and the screen stays put.
+    r = await post("/api/save", { q: "orders/cutoff", value: "yes", note: "after 4pm" })
+    expect(r.session.at).toBe("orders/cutoff")
+    expect(r.frontier).toBe("orders/cutoff_time")
+    // Open the first answer, add wholesale: the follow-up it opens becomes where they left off.
+    r = await post("/api/goto", { q: "orders/sources" })
+    expect(r.session.at).toBe("orders/sources")
+    r = await post("/api/save", { q: "orders/sources", value: ["walkin", "wholesale"] })
+    expect(r.frontier).toBe("orders/wholesale")
+    r = await post("/api/resume", {})
+    expect(r.session.at).toBe("orders/wholesale")
+    // A question that does not apply cannot be saved into.
+    const bad = await req("/api/save", { method: "POST", token: code, body: JSON.stringify({ q: "nope/x", value: "x" }) })
+    expect(bad.status).toBe(409)
+    const ex = (await (await req("/api/admin/export", { token: "admin" })).json()) as any
+    expect(ex.people[0].leftOff).toBe("orders/wholesale")
+    expect(ex.people[0].answers.find((a: any) => a.id === "orders/cutoff").note).toBe("after 4pm")
+  })
+
   test("non-audio is refused", async () => {
     const code = await invite()
     const res = await req("/api/voice?q=orders/sources", { method: "POST", token: code, body: "hi", headers: { "content-type": "text/plain" } })
