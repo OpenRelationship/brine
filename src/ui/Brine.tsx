@@ -6,7 +6,8 @@
 //
 // Nothing typed or recorded is lost. The box is kept in the browser as it changes (a reload
 // restores it), and leaving a question any way other than Next (Back, the chapter list, another
-// question, closing the tab) saves what is in the box to the server first. Earlier answers can be
+// question, closing the tab) saves what is in the box to the server first. A save that cannot
+// reach the server waits in an outbox on the device and is sent when the connection returns. Earlier answers can be
 // opened from the chapter list, edited and saved; the respondent then returns to where they left
 // off, which the server recomputes, so a changed answer that opens a new follow-up asks it.
 
@@ -62,6 +63,7 @@ function inviteCode(): string | null {
 }
 
 class Gone extends Error {}
+class Offline extends Error {}
 
 async function call<T>(code: string, path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`/api/${path}`, { ...init, headers: { authorization: `Bearer ${code}`, ...(init.body && !(init.body instanceof Blob) ? { "content-type": "application/json" } : {}), ...init.headers } })
@@ -72,7 +74,49 @@ async function call<T>(code: string, path: string, init: RequestInit = {}): Prom
   return body as T
 }
 
-const post = (code: string, path: string, body: unknown = {}) => call<View>(code, path, { method: "POST", body: JSON.stringify(body) })
+const post = (code: string, path: string, body: unknown = {}) =>
+  call<View>(code, path, { method: "POST", body: JSON.stringify(body) }).catch((e) => {
+    // fetch itself failing (not an error answer) means no connection.
+    throw e instanceof TypeError ? new Offline("You're offline. What you wrote is saved on this device and will be sent when you're back.") : e
+  })
+
+// Saves that could not reach the server, oldest first, per respondent.
+interface Pending {
+  q: string
+  body: Record<string, unknown>
+  at: string
+}
+const outbox = {
+  key: (code: string) => `outbox.${code.slice(0, 6)}`,
+  list: (code: string) => local.get<Pending[]>(outbox.key(code), []),
+  add(code: string, p: Pending) {
+    // The latest save of a question replaces an older unsent one.
+    local.set(outbox.key(code), [...outbox.list(code).filter((x) => x.q !== p.q), p])
+  },
+  // Send what is waiting, in order. Stops at the first save that still cannot get through.
+  async drain(code: string): Promise<View | null> {
+    let last: View | null = null
+    for (const p of outbox.list(code)) {
+      try {
+        last = await post(code, "save", { q: p.q, ...p.body })
+      } catch (e) {
+        if (e instanceof Offline) return last
+      }
+      local.set(outbox.key(code), outbox.list(code).filter((x) => x !== p && !(x.q === p.q && x.at === p.at)))
+    }
+    return last
+  },
+}
+
+// Save one question's box; when offline, keep it in the outbox and let the caller know.
+async function saveOrQueue(code: string, q: string, body: Record<string, unknown>): Promise<View> {
+  try {
+    return await post(code, "save", { q, ...body })
+  } catch (e) {
+    if (e instanceof Offline) outbox.add(code, { q, body, at: new Date().toISOString() })
+    throw e
+  }
+}
 
 const paragraphs = (text: string) => text.split(/\n\n+/).map((p, i) => <p key={i} className="brine-lede">{p}</p>)
 
@@ -112,8 +156,17 @@ export function Brine({ interview, brand, theme = "auto" }: { interview: Intervi
     [run],
   )
 
+  const [waiting, setWaiting] = useState(() => (code ? outbox.list(code).length : 0))
   useEffect(() => {
-    if (code) run(call<View>(code, "session")).catch(() => {})
+    if (!code) return
+    const sync = async () => {
+      await outbox.drain(code).catch(() => null)
+      setWaiting(outbox.list(code).length)
+      await run(call<View>(code, "session")).catch(() => {})
+    }
+    sync()
+    addEventListener("online", sync)
+    return () => removeEventListener("online", sync)
   }, [code, run])
 
   const shell = (body: ReactNode) => (
@@ -142,6 +195,7 @@ export function Brine({ interview, brand, theme = "auto" }: { interview: Intervi
         )}
       </header>
       <main className="brine-column">{body}</main>
+      {waiting > 0 && <p className="brine-waiting" role="status">Saved on this device. Sending when you're back online…</p>}
     </div>
   )
 
@@ -206,7 +260,7 @@ export function Brine({ interview, brand, theme = "auto" }: { interview: Intervi
       </section>,
     )
 
-  return shell(<Ask key={s.at} code={code!} walk={walk} view={view} error={error} run={run} leave={leave} flush={flush} />)
+  return shell(<Ask key={s.at} code={code!} walk={walk} view={view} error={error} run={run} leave={leave} flush={flush} onQueued={() => setWaiting(outbox.list(code!).length)} />)
 }
 
 // The chapter list as an index: parts, then numbered chapters, then numbered questions, each
@@ -378,6 +432,7 @@ function Ask({
   run,
   leave,
   flush,
+  onQueued,
 }: {
   code: string
   walk: ReturnType<typeof compile>
@@ -386,6 +441,7 @@ function Ask({
   run: (p: Promise<View>) => Promise<void>
   leave: (to: () => Promise<View>) => Promise<boolean>
   flush: React.MutableRefObject<(() => Promise<void>) | null>
+  onQueued: () => void
 }) {
   const s = view.session
   const q = walk.byId.get(s.at)!.question
@@ -411,7 +467,11 @@ function Ask({
   useEffect(() => {
     flush.current = async () => {
       const d = latest.current
-      if (dirty(d)) await run(post(code, "save", { q: s.at, ...payload(d) }))
+      if (dirty(d))
+        await run(saveOrQueue(code, s.at, payload(d))).catch((e) => {
+          if (e instanceof Offline) onQueued()
+          throw e
+        })
       local.set(draftKey, undefined)
     }
     // Closing the tab: a keepalive request carries the box to the server.
@@ -437,11 +497,14 @@ function Ask({
     try {
       if (how === "next") await run(post(code, "answer", { q: s.at, ...payload(latest.current) }))
       else {
-        if (dirty(latest.current)) await run(post(code, "save", { q: s.at, ...payload(latest.current) }))
+        if (dirty(latest.current)) await run(saveOrQueue(code, s.at, payload(latest.current)))
         await run(post(code, "resume"))
       }
       local.set(draftKey, undefined)
-    } catch {
+    } catch (e) {
+      // Offline on Next: the answer waits in the outbox (and the box stays as it is).
+      if (e instanceof Offline && how === "next") outbox.add(code, { q: s.at, body: payload(latest.current), at: new Date().toISOString() })
+      if (e instanceof Offline) onQueued()
       setBusy(false)
     }
   }

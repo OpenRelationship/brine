@@ -15,7 +15,9 @@
 //                  Export the class from the Worker's entry: `export const BrineSession = app.BrineSession`.
 //                  Without this binding walks fall back to KV (eventually consistent; one device).
 //   BRINE          KV namespace: invites, recording records, transcripts (each written once)
-//   BRINE_AUDIO    R2 bucket: the recordings themselves
+//   BRINE_AUDIO    R2 bucket: the recordings themselves, and the answer log: every answer and
+//                  every edit appended as its own object (log/<code>/<time>.json), never
+//                  overwritten, so any version of any answer can be recovered
 // Secrets:
 //   OPENROUTER_API_KEY   transcription and decisions (without it: no transcripts, fallback branches)
 //   BRINE_ADMIN_TOKEN    invites and export
@@ -32,14 +34,15 @@
 //   POST /api/goto               { q } -> the walk, at that question (to answer or edit it)
 //   POST /api/resume             -> the walk, back where the respondent left off
 //   POST /api/voice?q=<id>       raw audio body -> { id, seconds }
-//   DELETE /api/voice/<id>       drop a recording from an answer draft
+//   DELETE /api/voice/<id>       drop a recording from the answer box (the audio itself is kept)
 // Admin (bearer BRINE_ADMIN_TOKEN):
 //   POST /api/admin/invite       { name } -> { code }
 //   GET  /api/admin/invites      every invite with progress
 //   GET  /api/admin/export       every respondent, every asked question, with why, yields, answer, transcripts, decisions
 //   GET  /api/admin/audio/<id>   one recording
 //   POST /api/admin/transcribe   { id? } -> re-run transcription for one or every recording missing a transcript
-//   DELETE /api/admin/invite/<code>  the invite, its walk and its recordings, gone
+//   GET  /api/admin/log/<code>   every answer and edit that respondent made, oldest first
+//   DELETE /api/admin/invite/<code>  the invite, its walk, its log and its recordings, gone
 
 import type { Interview } from "./spec"
 import { answer, back, save as keep, begin, compile, END, fallbacks, goto, jump, progress, replay, resume, visible, type Answer, type Session, type Walk } from "./walk"
@@ -71,6 +74,7 @@ interface Recording {
   transcript?: string
   model?: string
   error?: string
+  dropped?: string // when the respondent removed it from their answer box; the audio is kept
 }
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } })
@@ -195,6 +199,7 @@ async function respondent(req: Request, env: Env, waitUntil: WaitUntil, walk: Wa
     const { a, decisions } = await take(b.q, b)
     const next = answer(walk, s, b.q, a, decisions)
     await store.save(next)
+    await log(env, invite.code, "answer", b.q, next)
     return json(view(next))
   }
 
@@ -205,6 +210,7 @@ async function respondent(req: Request, env: Env, waitUntil: WaitUntil, walk: Wa
     const { a, decisions } = await take(b.q, b)
     const next = keep(walk, s, b.q, a, decisions)
     await store.save(next)
+    await log(env, invite.code, "save", b.q, next)
     return json(view(next))
   }
 
@@ -242,10 +248,10 @@ async function respondent(req: Request, env: Env, waitUntil: WaitUntil, walk: Wa
     const rec = await env.BRINE.get<Recording>(`voice:${del[1]}`, "json")
     if (!rec || rec.code !== invite.code) return fail(404, "no such recording")
     const s = await store.load()
-    // Recordings already part of a submitted answer stay: they are what was said.
-    if (Object.values(s.answers).some((a) => a.voice?.includes(rec.id))) return json({ kept: true })
-    await Promise.all([env.BRINE.delete(`voice:${rec.id}`), env.BRINE_AUDIO.delete(`audio/${rec.code}/${rec.id}`)])
-    return json({ deleted: true })
+    // The audio is never deleted: the recording is marked dropped and stays in R2 and the export.
+    rec.dropped = new Date().toISOString()
+    await env.BRINE.put(`voice:${rec.id}`, JSON.stringify(rec))
+    return json({ dropped: true })
   }
 
   return fail(404, "no such route")
@@ -256,6 +262,15 @@ function clean(v: Answer["value"]): Answer["value"] {
   if (Array.isArray(v)) return v.map(String).slice(0, 50)
   if (typeof v === "number" && Number.isFinite(v)) return v
   return undefined
+}
+
+// Append one entry to the respondent's answer log in R2: what they did, to which question, the
+// answer as stored and the decisions on it. Keys sort by time; nothing is ever overwritten.
+async function log(env: Env, code: string, kind: "answer" | "save", q: string, s: Session) {
+  const at = new Date().toISOString()
+  const decisions = Object.fromEntries(Object.entries(s.decisions).filter(([k]) => k.startsWith(`${q}.`)))
+  const entry = { at, kind, q, answer: s.answers[q], decisions }
+  await env.BRINE_AUDIO.put(`log/${code}/${at}-${crypto.randomUUID().slice(0, 8)}.json`, JSON.stringify(entry), { httpMetadata: { contentType: "application/json" } })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -396,9 +411,20 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, 
         })
       }
       const { frontier } = replay(walk, s)
-      people.push({ name: i.name, code: i.code, started: s.started, finished: s.finished ?? null, leftOff: frontier === END ? null : frontier, answers: asked })
+      const dropped = (await all<Recording>(env, "voice:")).filter((r) => r.code === i.code && r.dropped)
+      people.push({ name: i.name, code: i.code, started: s.started, finished: s.finished ?? null, leftOff: frontier === END ? null : frontier, answers: asked, dropped: dropped.map((r) => ({ id: r.id, q: r.q, seconds: r.seconds, transcript: r.transcript ?? null })) })
     }
     return json({ interview: { id: walk.interview.id, title: walk.interview.title, glossary: walk.interview.glossary ?? {} }, exported: new Date().toISOString(), people })
+  }
+
+  const history = path.match(/^\/api\/admin\/log\/([\w-]+)$/)
+  if (history && req.method === "GET") {
+    const entries = []
+    for (const key of await listKeys(env, `log/${history[1]}/`)) {
+      const obj = await env.BRINE_AUDIO.get(key)
+      if (obj) entries.push(JSON.parse(await obj.text()))
+    }
+    return json(entries)
   }
 
   const revoke = path.match(/^\/api\/admin\/invite\/([\w-]+)$/)
@@ -408,6 +434,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, 
     const recs = (await all<Recording>(env, "voice:")).filter((r) => r.code === code)
     await Promise.all(recs.flatMap((r) => [env.BRINE.delete(`voice:${r.id}`), env.BRINE_AUDIO.delete(`audio/${code}/${r.id}`)]))
     if (env.BRINE_SESSIONS) await env.BRINE_SESSIONS.get(env.BRINE_SESSIONS.idFromName(code)).fetch(`https://brine/internal/session`, { method: "DELETE" })
+    await Promise.all((await listKeys(env, `log/${code}/`)).map((k) => env.BRINE_AUDIO.delete(k)))
     await Promise.all([env.BRINE.delete(`invite:${code}`), env.BRINE.delete(`session:${code}`)])
     return json({ revoked: code, recordings: recs.length })
   }
@@ -435,6 +462,17 @@ function labelOf(q: Interview["chapters"][number]["questions"][number], v: Answe
   if (v === undefined) return undefined
   const one = (x: string) => q.options?.find((o) => o.value === x)?.label ?? q.scale?.[Number(x)] ?? x
   return Array.isArray(v) ? v.map(one) : q.kind === "long" || q.kind === "text" || q.kind === "number" ? undefined : one(String(v))
+}
+
+async function listKeys(env: Env, prefix: string): Promise<string[]> {
+  const keys: string[] = []
+  let cursor: string | undefined
+  do {
+    const page = await env.BRINE_AUDIO.list({ prefix, cursor })
+    keys.push(...page.objects.map((o) => o.key))
+    cursor = page.truncated ? page.cursor : undefined
+  } while (cursor)
+  return keys.sort()
 }
 
 async function all<T>(env: Env, prefix: string): Promise<T[]> {
