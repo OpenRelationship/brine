@@ -441,62 +441,176 @@
   margin-top: 18px;
 }
 
-/* chapters */
-.brine-chapters {
+/* chapters: an index with guide lines, numbers and status marks */
+.brine-index {
   margin: 28px 0 0;
 }
-.brine-chapters ul {
-  list-style: none;
+.brine-index-part {
   margin: 0 0 22px;
-  padding: 0;
 }
-.brine-part {
+.brine-index-part > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-family: var(--brine-display);
   font-weight: 600;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
 }
-.brine-chapter,
-.brine-questions button {
+.brine-index-tab {
+  font-family: var(--brine-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--brine-fg);
+  color: var(--brine-bg);
+}
+.brine-index-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 14px;
+}
+.brine-index-tree > li {
+  position: relative;
+}
+/* the guide: a vertical line down the margin and a short tick into each row */
+.brine-index-tree > li::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--brine-line);
+}
+.brine-index-tree > li:last-child::before {
+  bottom: auto;
+  height: 20px;
+}
+.brine-index-tree > li::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 20px;
+  width: 10px;
+  border-top: 1px solid var(--brine-line);
+}
+.brine-index-row {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  padding: 8px 10px;
-  margin: 0 -10px;
+  min-height: 40px;
+  padding: 7px 10px 7px 8px;
   border: 0;
   border-radius: var(--brine-radius);
   background: none;
   text-align: left;
+  font: inherit;
+  color: inherit;
 }
-.brine-chapters button {
+button.brine-index-row {
   cursor: pointer;
 }
-.brine-chapters button:hover {
+button.brine-index-row:hover {
   background: var(--brine-well);
 }
-.brine-chapters li.here > .brine-chapter {
-  font-weight: 600;
-}
-.brine-chapters li.done > .brine-chapter .brine-grow {
+.brine-index-num {
+  font-family: var(--brine-mono);
+  font-size: 0.75rem;
   color: var(--brine-soft);
+  min-width: 2.2em;
+  font-variant-numeric: tabular-nums;
+}
+.brine-index-title {
+  font-weight: 500;
+}
+.brine-index-tree > li.here > .brine-index-row {
+  background: var(--brine-on);
+  box-shadow: inset 3px 0 0 var(--brine-accent-edge, var(--brine-fg));
+}
+.brine-index-tree > li.done > .brine-index-row .brine-index-title {
+  color: var(--brine-soft);
+}
+.brine-index-questions {
+  margin: 2px 0 8px 18px;
+}
+.brine-index-questions .brine-index-row {
+  font-size: 0.9375rem;
+  align-items: flex-start;
+  min-height: 36px;
+}
+.brine-index-questions .brine-index-row > * {
+  margin-top: 1px;
+}
+.brine-index-questions li.open:not(.here) .brine-grow {
+  color: var(--brine-soft);
+}
+.brine-index-voice {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 .brine-count {
   font-size: 0.8125rem;
   color: var(--brine-soft);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
-.brine-questions {
-  margin: 2px 0 10px !important;
-  padding-left: 14px !important;
+
+/* icons */
+.brine-icon {
+  flex: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.brine-questions button {
-  font-size: 0.9375rem;
+.brine-icon-ring .track {
+  fill: none;
+  stroke: var(--brine-line);
+  stroke-width: 2;
 }
-.brine-questions button.here {
-  background: var(--brine-on);
+.brine-icon-ring .fill {
+  fill: none;
+  stroke: var(--brine-fg);
+  stroke-width: 2;
 }
-.brine-questions button.open .brine-grow {
-  color: var(--brine-soft);
+.brine-icon-done circle,
+.brine-mark.answered circle {
+  fill: var(--brine-accent-edge, var(--brine-fg));
+}
+.brine-icon-done path,
+.brine-mark.answered path {
+  stroke: var(--brine-accent-ink);
+  stroke-width: 1.8;
+}
+.brine-mark.open circle {
+  fill: none;
+  stroke: var(--brine-line);
+  stroke-width: 1.5;
+}
+.brine-mark.open.next circle {
+  fill: var(--brine-fg);
+  stroke: none;
+}
+.brine-mark.skipped circle {
+  fill: none;
+  stroke: var(--brine-soft);
+  stroke-width: 1.3;
+}
+.brine-mark.skipped path {
+  stroke: var(--brine-soft);
+  stroke-width: 1.5;
+}
+.brine-chevron path {
+  stroke: var(--brine-soft);
+  stroke-width: 1.6;
+}
+.brine-chevron {
+  transition: transform 150ms ease;
+}
+.brine-chevron.open {
+  transform: rotate(90deg);
 }
 
 .brine-welcome h1 {

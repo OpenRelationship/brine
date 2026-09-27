@@ -209,60 +209,138 @@ export function Brine({ interview, brand, theme = "auto" }: { interview: Intervi
   return shell(<Ask key={s.at} code={code!} walk={walk} view={view} error={error} run={run} leave={leave} flush={flush} />)
 }
 
+// The chapter list as an index: parts, then numbered chapters, then numbered questions, each
+// level indented on a guide line, each row with its status. Without onOpen it is a read-only
+// outline (the welcome page); with it, chapters open and questions can be picked.
 function Chapters({ view, walk, onOpen }: { view: View; walk: ReturnType<typeof compile>; onOpen?: (q: string) => void }) {
   const here = walk.byId.get(view.session.at)?.chapter.id
   const [open, setOpen] = useState<string | null>(onOpen ? (here ?? null) : null)
   const rows = view.progress.filter((c) => c.total > 0)
   // Consecutive chapters that share a part are listed under it, in the order of the process.
-  const groups: { part?: string; rows: typeof rows }[] = []
-  for (const c of rows) {
+  const groups: { part?: string; rows: (typeof rows[number] & { n: number })[] }[] = []
+  rows.forEach((c, i) => {
     const last = groups[groups.length - 1]
-    if (last && last.part === c.part) last.rows.push(c)
-    else groups.push({ part: c.part, rows: [c] })
-  }
+    const row = { ...c, n: i + 1 }
+    if (last && last.part === c.part) last.rows.push(row)
+    else groups.push({ part: c.part, rows: [row] })
+  })
   const reached = new Set([...view.path, view.frontier])
+  const pad = (n: number) => String(n).padStart(2, "0")
+
   return (
-    <div className="brine-chapters">
-      {groups.map((g, gi) => (
-        <section key={gi}>
-          {g.part && <p className="brine-part">{g.part}</p>}
-          <ul>
-            {g.rows.map((c) => {
-              const done = c.answered >= c.total
-              const inner = (
-                <>
-                  <span className="brine-grow">{c.title}</span>
-                  <span className="brine-count">{done ? "done" : c.answered ? `${c.answered} of ${c.total}` : `${c.total} questions`}</span>
-                </>
-              )
-              return (
-                <li key={c.id} className={`${c.id === here ? "here" : ""} ${done ? "done" : ""}`}>
-                  {onOpen ? (
-                    <button type="button" className="brine-chapter" aria-expanded={open === c.id} onClick={() => setOpen(open === c.id ? null : c.id)}>{inner}</button>
-                  ) : (
-                    <div className="brine-chapter">{inner}</div>
-                  )}
-                  {onOpen && open === c.id && (
-                    <ul className="brine-questions">
-                      {c.questions.map((q) => (
-                        <li key={q.id}>
-                          <button type="button" className={`${q.id === view.session.at ? "here" : ""} ${q.status}`} onClick={() => onOpen(q.id)}>
-                            <span className="brine-grow">{q.ask}</span>
-                            <span className="brine-count">
-                              {q.status === "answered" ? (q.voice ? `answered · ${q.voice} recording${q.voice > 1 ? "s" : ""}` : "answered") : q.status === "skipped" ? "skipped" : reached.has(q.id) ? "next" : "not yet"}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      ))}
+    <div className="brine-index">
+      {groups.map((g, gi) => {
+        const answered = g.rows.reduce((k, c) => k + c.answered, 0)
+        const total = g.rows.reduce((k, c) => k + c.total, 0)
+        return (
+          <section key={gi} className="brine-index-part">
+            {g.part && (
+              <header>
+                <span className="brine-index-tab">Part {gi + 1}</span>
+                <span className="brine-grow">{g.part}</span>
+                <span className="brine-count">{answered} / {total}</span>
+              </header>
+            )}
+            <ul className="brine-index-tree">
+              {g.rows.map((c) => {
+                const done = c.answered >= c.total
+                const isOpen = Boolean(onOpen) && open === c.id
+                const inner = (
+                  <>
+                    <Ring value={c.answered / c.total} />
+                    <span className="brine-index-num">{pad(c.n)}</span>
+                    <span className="brine-grow brine-index-title">{c.title}</span>
+                    <span className="brine-count">{done ? "done" : `${c.answered} / ${c.total}`}</span>
+                    {onOpen && <Chevron open={isOpen} />}
+                  </>
+                )
+                return (
+                  <li key={c.id} className={`${c.id === here ? "here" : ""} ${done ? "done" : ""}`}>
+                    {onOpen ? (
+                      <button type="button" className="brine-index-row" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : c.id)}>{inner}</button>
+                    ) : (
+                      <div className="brine-index-row">{inner}</div>
+                    )}
+                    {isOpen && (
+                      <ul className="brine-index-tree brine-index-questions">
+                        {c.questions.map((q, qi) => {
+                          const now = q.id === view.session.at
+                          const next = q.status === "open" && reached.has(q.id)
+                          return (
+                            <li key={q.id} className={`${now ? "here" : ""} ${q.status}`}>
+                              <button type="button" className="brine-index-row" onClick={() => onOpen!(q.id)}>
+                                <Mark status={q.status} next={next} />
+                                <span className="brine-index-num">{c.n}.{qi + 1}</span>
+                                <span className="brine-grow">{q.ask}</span>
+                                {q.voice > 0 && (
+                                  <span className="brine-count brine-index-voice" title={`${q.voice} recording${q.voice > 1 ? "s" : ""}`}>
+                                    <WaveIcon size={13} />
+                                    {q.voice > 1 ? q.voice : ""}
+                                  </span>
+                                )}
+                                {now ? <span className="brine-count">here</span> : next ? <span className="brine-count">next</span> : q.status === "skipped" ? <span className="brine-count">skipped</span> : null}
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )
+      })}
     </div>
+  )
+}
+
+// A chapter's progress: an empty circle, a filling ring, or a filled check.
+function Ring({ value }: { value: number }) {
+  const r = 7
+  const c = 2 * Math.PI * r
+  if (value >= 1)
+    return (
+      <svg className="brine-icon brine-icon-done" width="18" height="18" viewBox="0 0 18 18" aria-label="done">
+        <circle cx="9" cy="9" r="8" />
+        <path d="M5.5 9.2l2.3 2.3 4.7-4.9" fill="none" />
+      </svg>
+    )
+  return (
+    <svg className="brine-icon brine-icon-ring" width="18" height="18" viewBox="0 0 18 18" aria-label={`${Math.round(value * 100)}% answered`}>
+      <circle cx="9" cy="9" r={r} className="track" />
+      {value > 0 && <circle cx="9" cy="9" r={r} className="fill" strokeDasharray={`${value * c} ${c}`} transform="rotate(-90 9 9)" />}
+    </svg>
+  )
+}
+
+// A question's status: answered (check), skipped (dash), next up (filled dot), not yet (circle).
+function Mark({ status, next }: { status: Status; next: boolean }) {
+  return (
+    <svg className={`brine-icon brine-mark ${status} ${next ? "next" : ""}`} width="16" height="16" viewBox="0 0 16 16" aria-label={next ? "next" : status === "open" ? "not yet" : status}>
+      {status === "answered" ? (
+        <>
+          <circle cx="8" cy="8" r="7" />
+          <path d="M4.8 8.2l2 2 4.3-4.4" fill="none" />
+        </>
+      ) : status === "skipped" ? (
+        <>
+          <circle cx="8" cy="8" r="6.5" />
+          <path d="M5 8h6" />
+        </>
+      ) : (
+        <circle cx="8" cy="8" r={next ? 4 : 6} />
+      )}
+    </svg>
+  )
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg className={`brine-icon brine-chevron ${open ? "open" : ""}`} width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+      <path d="M5 3l4 4-4 4" fill="none" />
+    </svg>
   )
 }
 
