@@ -131,7 +131,7 @@ function number(view: View, id: string) {
 // theme: "auto" follows the device; "light" or "dark" pins it (for brands with one theme).
 export function Brine({ interview, brand, theme = "auto" }: { interview: Interview; brand: Brand; theme?: "auto" | "light" | "dark" }) {
   const walk = useMemo(() => compile(interview), [interview])
-  const [code] = useState(inviteCode)
+  const [code, setCode] = useState(inviteCode)
   const [view, setView] = useState<View | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [gone, setGone] = useState(!code)
@@ -218,12 +218,17 @@ export function Brine({ interview, brand, theme = "auto" }: { interview: Intervi
     </div>
   )
 
-  if (gone)
+  if (gone || !code)
     return shell(
-      <section>
-        <h1>This interview is by invitation.</h1>
-        <p className="brine-lede">Open the link you were sent. If it stopped working, ask for a new one; your answers are kept.</p>
-      </section>,
+      <Passcode
+        expired={Boolean(code)}
+        onEnter={(c) => {
+          local.set("code", c)
+          setView(null)
+          setGone(false)
+          setCode(c)
+        }}
+      />,
     )
   if (!view) return shell(error ? <p className="brine-error" role="alert">{error}</p> : <p className="brine-lede">Loading…</p>)
 
@@ -278,6 +283,38 @@ export function Brine({ interview, brand, theme = "auto" }: { interview: Intervi
 // The chapter list as an index: parts, then numbered chapters, then numbered questions, each
 // level indented on a guide line, each row with its status. Without onOpen it is a read-only
 // outline (the welcome page); with it, chapters open and questions can be picked.
+// The bare site: type the passcode you were given. A link with ?i= skips this.
+function Passcode({ expired, onEnter }: { expired: boolean; onEnter: (code: string) => void }) {
+  const [value, setValue] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(expired ? "That link has stopped working. Type your passcode instead." : null)
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!value.trim() || busy) return
+    setBusy(true)
+    try {
+      const res = await fetch("/api/enter", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ passcode: value }) })
+      const body = (await res.json().catch(() => ({}))) as { code?: string; error?: string }
+      if (!res.ok || !body.code) throw new Error(body.error || "We couldn't check that. Try again.")
+      onEnter(body.code)
+    } catch (err) {
+      setError(err instanceof TypeError ? "You're offline. Connect and try again." : (err as Error).message)
+      setBusy(false)
+    }
+  }
+  return (
+    <section className="brine-welcome">
+      <h1>Enter your passcode</h1>
+      <p className="brine-lede">It was sent to you with the invitation. You only need it once on this device.</p>
+      <form className="brine-passcode" onSubmit={submit}>
+        <input className="brine-well" autoFocus autoComplete="one-time-code" autoCapitalize="none" spellCheck={false} aria-label="Passcode" value={value} onChange={(e) => setValue(e.target.value)} />
+        <button type="submit" className="brine-key brine-accent" disabled={busy || !value.trim()}>{busy ? "Checking…" : "Enter →"}</button>
+      </form>
+      {error && <p className="brine-error" role="alert">{error}</p>}
+    </section>
+  )
+}
+
 function Chapters({ view, walk, onOpen }: { view: View; walk: ReturnType<typeof compile>; onOpen?: (q: string) => void }) {
   const here = walk.byId.get(view.session.at)?.chapter.id
   const [open, setOpen] = useState<string | null>(onOpen ? (here ?? null) : null)

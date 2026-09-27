@@ -193,6 +193,25 @@ describe("worker", () => {
     expect(ex.people[0].answers.find((a: any) => a.id === "orders/cutoff").note).toBe("after 4pm")
   })
 
+  test("a passcode typed on the site trades for the invite", async () => {
+    const code = await invite()
+    const set = await req("/api/admin/passcode", { method: "POST", token: "admin", body: JSON.stringify({ code, passcode: "4827-19" }) })
+    expect(set.status).toBe(200)
+    const ok = (await (await req("/api/enter", { method: "POST", body: JSON.stringify({ passcode: " 482719 " }) })).json()) as any
+    expect(ok.code).toBe(code)
+    expect((await req("/api/enter", { method: "POST", body: JSON.stringify({ passcode: "000000" }) })).status).toBe(401)
+    // Changing it retires the old one; revoking removes it.
+    await req("/api/admin/passcode", { method: "POST", token: "admin", body: JSON.stringify({ code, passcode: "tacoma-nurse" }) })
+    expect((await req("/api/enter", { method: "POST", body: JSON.stringify({ passcode: "482719" }) })).status).toBe(401)
+    await req(`/api/admin/invite/${code}`, { method: "DELETE", token: "admin" })
+    expect((await req("/api/enter", { method: "POST", body: JSON.stringify({ passcode: "tacoma-nurse" }) })).status).toBe(401)
+  })
+
+  test("passcode attempts are rate limited when a limiter is bound", async () => {
+    env.BRINE_ENTER_LIMIT = { limit: async () => ({ success: false }) }
+    expect((await req("/api/enter", { method: "POST", body: JSON.stringify({ passcode: "anything" }) })).status).toBe(429)
+  })
+
   test("non-audio is refused", async () => {
     const code = await invite()
     const res = await req("/api/voice?q=orders/sources", { method: "POST", token: code, body: "hi", headers: { "content-type": "text/plain" } })

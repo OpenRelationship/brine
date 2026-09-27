@@ -420,6 +420,17 @@
   white-space: nowrap;
 }
 
+.brine-passcode {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.brine-passcode .brine-well {
+  margin-top: 0;
+  font-size: 1.125rem;
+  letter-spacing: 0.04em;
+}
+
 /* the question: question, context, answer, and ways to think about it */
 .brine-context {
   font-size: 1.0625rem;
