@@ -4,6 +4,7 @@
 //   brine check <interview.ts>            lint the question tree and print its size
 //   brine outline <interview.ts>          every question with its guard, why and yields (markdown)
 //   brine invite <url> <name>             make an invite link              (BRINE_ADMIN_TOKEN)
+//   brine passcode <url> <code> <passcode>  let that respondent in by typing a passcode on the site
 //   brine status <url>                    who is how far                    (BRINE_ADMIN_TOKEN)
 //   brine export <url> [dir]              answers.json + answers.md         (BRINE_ADMIN_TOKEN)
 //   brine transcribe <url>                retry every recording without a transcript
@@ -90,6 +91,13 @@ async function main() {
     return
   }
 
+  if (cmd === "passcode") {
+    const [url, code, ...words] = args
+    const r = await admin(url)<{ name: string; entry: string }>("passcode", { method: "POST", body: JSON.stringify({ code, passcode: words.join(" ") }) })
+    console.log(`${r.name}: open ${r.entry} and type the passcode`)
+    return
+  }
+
   if (cmd === "status") {
     const rows = await admin(args[0])<{ code: string; name: string; answered: number; at: string | null; finished: string | null; created: string }[]>("invites")
     for (const r of rows) console.log(`${r.code}  ${r.name.padEnd(24)} ${String(r.answered).padStart(4)} answered  ${r.finished ? `finished ${r.finished.slice(0, 10)}` : r.at ? `at ${r.at}` : ""}`)
@@ -145,7 +153,7 @@ async function main() {
     return
   }
 
-  console.log(`brine check <interview.ts> | outline <interview.ts> | invite <url> <name> | status <url> | export <url> [dir] | transcribe <url> | revoke <url> <code>`)
+  console.log(`brine check <interview.ts> | outline <interview.ts> | invite <url> <name> | passcode <url> <code> <passcode> | status <url> | export <url> [dir] | transcribe <url> | revoke <url> <code>`)
   process.exit(cmd ? 2 : 0)
 }
 

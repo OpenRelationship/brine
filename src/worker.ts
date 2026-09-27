@@ -25,7 +25,9 @@
 //   BRINE_STT_MODEL      default openai/gpt-4o-mini-transcribe
 //   BRINE_DECIDE_MODEL   default typesafe/jev-1.13
 //
-// Routes. The respondent's bearer token is their invite code.
+// Routes. The respondent's bearer token is their invite code. A respondent can also be given a
+// passcode to type on the bare site instead of (or as well as) the link.
+//   POST /api/enter              { passcode } -> { code } (rate limited when BRINE_ENTER_LIMIT is bound)
 //   GET  /api/session            the respondent and their walk (starts one on first visit)
 //   POST /api/answer             { q, value?, note?, voice?, skipped? } -> the walk, moved on
 //   POST /api/save               { q, value?, note?, voice? } -> the walk, answer kept, not moved
@@ -36,7 +38,8 @@
 //   POST /api/voice?q=<id>       raw audio body -> { id, seconds }
 //   DELETE /api/voice/<id>       drop a recording from the answer box (the audio itself is kept)
 // Admin (bearer BRINE_ADMIN_TOKEN):
-//   POST /api/admin/invite       { name } -> { code }
+//   POST /api/admin/invite       { name, passcode? } -> { code, link }
+//   POST /api/admin/passcode     { code, passcode } -> set or replace that invite's passcode
 //   GET  /api/admin/invites      every invite with progress
 //   GET  /api/admin/export       every respondent, every asked question, with why, yields, answer, transcripts, decisions
 //   GET  /api/admin/audio/<id>   one recording
@@ -55,12 +58,15 @@ export interface Env {
   BRINE_ADMIN_TOKEN?: string
   BRINE_STT_MODEL?: string
   BRINE_DECIDE_MODEL?: string
+  // Optional rate limit on passcode attempts (wrangler "ratelimits" binding, keyed by IP).
+  BRINE_ENTER_LIMIT?: { limit(o: { key: string }): Promise<{ success: boolean }> }
 }
 
 interface Invite {
   code: string
   name: string
   created: string
+  passcode?: string // sha-256 of the passcode, when one is set
 }
 
 interface Recording {
@@ -136,6 +142,7 @@ export function brine(interview: Interview) {
           if (!env.BRINE_ADMIN_TOKEN || !token || !same(token, env.BRINE_ADMIN_TOKEN)) return fail(401, "admin token required")
           return await admin(req, env, ctx, walk, path, url)
         }
+        if (path === "/api/enter" && req.method === "POST") return await enter(req, env)
         const code = bearer(req)
         const invite = code ? await env.BRINE.get<Invite>(`invite:${code}`, "json") : null
         if (!invite) return fail(401, "This link is not valid. Ask for a new one.")
@@ -154,6 +161,33 @@ export function brine(interview: Interview) {
       }
     },
   }
+}
+
+// A passcode typed on the bare site, traded for the invite code it belongs to.
+async function enter(req: Request, env: Env) {
+  const ip = req.headers.get("cf-connecting-ip") ?? "local"
+  if (env.BRINE_ENTER_LIMIT && !(await env.BRINE_ENTER_LIMIT.limit({ key: ip })).success) return fail(429, "Too many tries. Wait a minute and try again.")
+  const { passcode } = (await req.json().catch(() => ({}))) as { passcode?: string }
+  const code = passcode?.trim() ? await env.BRINE.get(`passcode:${await digest(passcode)}`) : null
+  if (!code || !(await env.BRINE.get(`invite:${code}`))) return fail(401, "That passcode doesn't match. Check it and try again.")
+  return json({ code })
+}
+
+// Passcodes are compared case-insensitively, ignoring spaces and dashes.
+async function digest(passcode: string) {
+  const norm = passcode.toLowerCase().replace(/[\s-]+/g, "")
+  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`brine:${norm}`)))
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")
+}
+
+async function setPasscode(env: Env, invite: Invite, passcode: string) {
+  const hash = await digest(passcode)
+  const taken = await env.BRINE.get(`passcode:${hash}`)
+  if (taken && taken !== invite.code) return false
+  if (invite.passcode && invite.passcode !== hash) await env.BRINE.delete(`passcode:${invite.passcode}`)
+  await env.BRINE.put(`passcode:${hash}`, invite.code)
+  await env.BRINE.put(`invite:${invite.code}`, JSON.stringify({ ...invite, passcode: hash }))
+  return true
 }
 
 // A walk kept in KV (before Durable Objects, or without the binding).
@@ -270,8 +304,12 @@ async function log(env: Env, code: string, kind: "answer" | "save", q: string, s
   const at = new Date().toISOString()
   const decisions = Object.fromEntries(Object.entries(s.decisions).filter(([k]) => k.startsWith(`${q}.`)))
   const entry = { at, kind, q, answer: s.answers[q], decisions }
-  await env.BRINE_AUDIO.put(`log/${code}/${at}-${crypto.randomUUID().slice(0, 8)}.json`, JSON.stringify(entry), { httpMetadata: { contentType: "application/json" } })
+  // The time, then a counter, so entries written in the same millisecond still sort in order.
+  // (A respondent's requests run one at a time in one object, so one counter orders them.)
+  const seq = String(++logged).padStart(6, "0")
+  await env.BRINE_AUDIO.put(`log/${code}/${at}-${seq}.json`, JSON.stringify(entry), { httpMetadata: { contentType: "application/json" } })
 }
+let logged = 0
 
 // ---------------------------------------------------------------------------------------------
 // Transcription: a speech-to-text model through OpenRouter's /audio/transcriptions.
@@ -361,12 +399,22 @@ async function decide(env: Env, walk: Walk, id: string, a: Omit<Answer, "at">): 
 
 async function admin(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, path: string, url: URL) {
   if (path === "/api/admin/invite" && req.method === "POST") {
-    const { name } = (await req.json()) as { name?: string }
+    const { name, passcode } = (await req.json()) as { name?: string; passcode?: string }
     if (!name?.trim()) return fail(400, "name required")
     const code = token()
     const invite: Invite = { code, name: name.trim(), created: new Date().toISOString() }
     await env.BRINE.put(`invite:${code}`, JSON.stringify(invite))
-    return json({ ...invite, link: `${url.origin}/?i=${code}` })
+    if (passcode?.trim() && !(await setPasscode(env, invite, passcode))) return fail(409, "That passcode belongs to someone else.")
+    return json({ code, name: invite.name, created: invite.created, link: `${url.origin}/?i=${code}` })
+  }
+
+  if (path === "/api/admin/passcode" && req.method === "POST") {
+    const { code, passcode } = (await req.json()) as { code?: string; passcode?: string }
+    const invite = code ? await env.BRINE.get<Invite>(`invite:${code}`, "json") : null
+    if (!invite) return fail(404, "no such invite")
+    if (!passcode?.trim() || passcode.replace(/[\s-]/g, "").length < 6) return fail(400, "a passcode needs six or more characters")
+    if (!(await setPasscode(env, invite, passcode))) return fail(409, "That passcode belongs to someone else.")
+    return json({ code, name: invite.name, entry: url.origin })
   }
 
   if (path === "/api/admin/invites" && req.method === "GET") {
@@ -430,7 +478,9 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, 
   const revoke = path.match(/^\/api\/admin\/invite\/([\w-]+)$/)
   if (revoke && req.method === "DELETE") {
     const code = revoke[1]
-    if (!(await env.BRINE.get(`invite:${code}`))) return fail(404, "no such invite")
+    const gone = await env.BRINE.get<Invite>(`invite:${code}`, "json")
+    if (!gone) return fail(404, "no such invite")
+    if (gone.passcode) await env.BRINE.delete(`passcode:${gone.passcode}`)
     const recs = (await all<Recording>(env, "voice:")).filter((r) => r.code === code)
     await Promise.all(recs.flatMap((r) => [env.BRINE.delete(`voice:${r.id}`), env.BRINE_AUDIO.delete(`audio/${code}/${r.id}`)]))
     if (env.BRINE_SESSIONS) await env.BRINE_SESSIONS.get(env.BRINE_SESSIONS.idFromName(code)).fetch(`https://brine/internal/session`, { method: "DELETE" })
