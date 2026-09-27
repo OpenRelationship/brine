@@ -22,8 +22,18 @@
   --brine-accent-shadow: var(--brine-key-shadow);
   --brine-plate-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04);
 }
+.brine[data-theme="dark"] {
+  --brine-bg: #0e1013;
+  --brine-fg: #eceef2;
+  --brine-soft: #9aa1ae;
+  --brine-line: #262a31;
+  --brine-well: #16191e;
+  --brine-accent: #eceef2;
+  --brine-accent-ink: #0e1013;
+  --brine-on: #1d2127;
+}
 @media (prefers-color-scheme: dark) {
-  .brine:not([data-theme="light"]) {
+  .brine:not([data-theme]) {
     --brine-bg: #0e1013;
     --brine-fg: #eceef2;
     --brine-soft: #9aa1ae;

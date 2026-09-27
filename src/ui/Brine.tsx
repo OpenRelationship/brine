@@ -56,7 +56,8 @@ async function call<T>(code: string, path: string, init: RequestInit = {}): Prom
   return body as T
 }
 
-export function Brine({ interview, brand }: { interview: Interview; brand: Brand }) {
+// theme: "auto" follows the device; "light" or "dark" pins it (for brands with one theme).
+export function Brine({ interview, brand, theme = "auto" }: { interview: Interview; brand: Brand; theme?: "auto" | "light" | "dark" }) {
   const walk = useMemo(() => compile(interview), [interview])
   const [code] = useState(inviteCode)
   const [view, setView] = useState<View | null>(null)
@@ -81,7 +82,7 @@ export function Brine({ interview, brand }: { interview: Interview; brand: Brand
   }, [code])
 
   const shell = (body: ReactNode, wide = false) => (
-    <div className="brine">
+    <div className="brine" data-theme={theme === "auto" ? undefined : theme}>
       <header className="brine-bar">
         <span className="brine-brand">
           {brand.mark}
