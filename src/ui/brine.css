@@ -431,6 +431,7 @@
 .brine-hints ul {
   margin: 0;
   padding-left: 1.1em;
+  list-style: disc;
 }
 .brine-hints li {
   margin: 4px 0;
