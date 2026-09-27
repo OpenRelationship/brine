@@ -544,6 +544,9 @@ button.brine-index-row:hover {
 .brine-index-questions .brine-index-row > * {
   margin-top: 1px;
 }
+.brine-index-questions .brine-index-num {
+  min-width: 3.2em;
+}
 .brine-index-questions li.open:not(.here) .brine-grow {
   color: var(--brine-soft);
 }
