@@ -161,8 +161,9 @@ export function Recorder({ upload, onRecorded, onBusy }: { upload: (blob: Blob, 
     )
 
   return (
-    <button type="button" className="brine-mic" onClick={start} disabled={phase.kind === "asking"} title="Answer out loud" aria-label="Record your answer">
+    <button type="button" className="brine-mic" onClick={start} disabled={phase.kind === "asking"} title="Answer out loud">
       <WaveIcon />
+      <span>{phase.kind === "asking" ? "Starting…" : "Talk"}</span>
     </button>
   )
 }

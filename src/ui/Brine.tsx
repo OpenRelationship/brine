@@ -122,12 +122,12 @@ export function Brine({ interview, brand, theme = "auto" }: { interview: Intervi
         ) : (
           <p className="brine-lede">You've answered {Object.keys(s.answers).length} so far. We'll pick up where you left off.</p>
         )}
-        <Chapters view={view} walk={walk} onPick={null} />
         <div className="brine-row">
           <button type="button" className="brine-key brine-accent" onClick={() => setStarted(true)} autoFocus>
             {fresh ? "Begin" : "Keep going"} →
           </button>
         </div>
+        <Chapters view={view} walk={walk} onPick={null} />
       </section>,
     )
 
@@ -320,7 +320,7 @@ function Ask({ code, walk, view, error, run }: { code: string; walk: ReturnType<
         {node.chapter.part ? `${node.chapter.part} · ` : ""}
         {String(ci + 1).padStart(2, "0")} {node.chapter.title}
       </p>
-      {chapterFirst && node.chapter.lede && <p className="brine-lede">{node.chapter.lede}</p>}
+      {chapterFirst && node.chapter.lede && <p className="brine-lede brine-chapter-lede">{node.chapter.lede}</p>}
       <h1>{q.ask}</h1>
       {q.hint && <p className="brine-soft">{q.hint}</p>}
 
