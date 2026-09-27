@@ -4,10 +4,17 @@
 //
 //   import { brine } from "brine/worker"
 //   import { interview } from "./questions"
-//   export default brine(interview)
+//   const app = brine(interview)
+//   export default app
+//   export const BrineSession = app.BrineSession
 //
 // Bindings (wrangler.jsonc):
-//   BRINE          KV namespace: invites, sessions, recording records, transcripts
+//   BRINE_SESSIONS Durable Object namespace (class BrineSession): one object per respondent holds
+//                  their walk. Strongly consistent and one request at a time, so a double press,
+//                  two tabs or a phone and a laptop can never overwrite each other's answers.
+//                  Export the class from the Worker's entry: `export const BrineSession = app.BrineSession`.
+//                  Without this binding walks fall back to KV (eventually consistent; one device).
+//   BRINE          KV namespace: invites, recording records, transcripts (each written once)
 //   BRINE_AUDIO    R2 bucket: the recordings themselves
 // Secrets:
 //   OPENROUTER_API_KEY   transcription and decisions (without it: no transcripts, fallback branches)
@@ -38,6 +45,7 @@ import type { Interview } from "./spec"
 import { answer, back, save as keep, begin, compile, END, fallbacks, goto, jump, progress, replay, resume, visible, type Answer, type Session, type Walk } from "./walk"
 
 export interface Env {
+  BRINE_SESSIONS?: DurableObjectNamespace
   BRINE: KVNamespace
   BRINE_AUDIO: R2Bucket
   OPENROUTER_API_KEY?: string
@@ -71,10 +79,49 @@ const bearer = (req: Request) => req.headers.get("authorization")?.match(/^Beare
 
 const MAX_AUDIO = 25 * 1024 * 1024 // the transcription endpoint's limit; about 25 minutes of opus
 
+// Where a respondent's walk is kept.
+interface Store {
+  load(): Promise<Session>
+  save(s: Session): Promise<void>
+}
+
+type WaitUntil = (p: Promise<unknown>) => void
+
 export function brine(interview: Interview) {
   const walk = compile(interview)
 
+  // One object per respondent (named by invite code). Requests are handled one after another:
+  // each reads the walk, changes it and writes it before the next one starts.
+  class BrineSession {
+    private queue: Promise<unknown> = Promise.resolve()
+    constructor(
+      private state: DurableObjectState,
+      private env: Env,
+    ) {}
+
+    async fetch(req: Request): Promise<Response> {
+      const url = new URL(req.url)
+      const storage = this.state.storage
+      const store: Store = {
+        load: async () => (await storage.get<Session>("session")) ?? (await legacy(this.env, walk, url.searchParams.get("code") ?? "")) ?? begin(walk),
+        save: (s) => storage.put("session", s),
+      }
+      const run = this.queue.then(async () => {
+        if (url.pathname === "/internal/session") {
+          if (req.method === "DELETE") return await storage.deleteAll(), json({ deleted: true })
+          return json((await storage.get<Session>("session")) ?? null)
+        }
+        const invite = JSON.parse(req.headers.get("x-brine-invite") ?? "null") as Invite | null
+        if (!invite) return fail(401, "no invite")
+        return respondent(req, this.env, (p) => this.state.waitUntil(p), walk, invite, url.pathname.replace(/\/+$/, ""), url, store)
+      })
+      this.queue = run.catch(() => {})
+      return run
+    }
+  }
+
   return {
+    BrineSession,
     async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
       const url = new URL(req.url)
       const path = url.pathname.replace(/\/+$/, "")
@@ -88,7 +135,15 @@ export function brine(interview: Interview) {
         const code = bearer(req)
         const invite = code ? await env.BRINE.get<Invite>(`invite:${code}`, "json") : null
         if (!invite) return fail(401, "This link is not valid. Ask for a new one.")
-        return await respondent(req, env, ctx, walk, invite, path, url)
+        if (env.BRINE_SESSIONS) {
+          const inner = new URL(req.url)
+          inner.searchParams.set("code", invite.code)
+          const fwd = new Request(inner, req)
+          fwd.headers.set("x-brine-invite", JSON.stringify(invite))
+          return await env.BRINE_SESSIONS.get(env.BRINE_SESSIONS.idFromName(invite.code)).fetch(fwd)
+        }
+        const store: Store = { load: async () => (await legacy(env, walk, invite.code)) ?? begin(walk), save: (s) => env.BRINE.put(`session:${invite.code}`, JSON.stringify(s)) }
+        return await respondent(req, env, (p) => ctx.waitUntil(p), walk, invite, path, url, store)
       } catch (e) {
         console.error(e)
         return fail(500, "Something went wrong on our side. Your answers so far are saved.")
@@ -97,12 +152,20 @@ export function brine(interview: Interview) {
   }
 }
 
-async function load(env: Env, walk: Walk, code: string): Promise<Session> {
-  return (await env.BRINE.get<Session>(`session:${code}`, "json")) ?? begin(walk)
-}
-const save = (env: Env, code: string, s: Session) => env.BRINE.put(`session:${code}`, JSON.stringify(s))
+// A walk kept in KV (before Durable Objects, or without the binding).
+const legacy = (env: Env, _walk: Walk, code: string) => (code ? env.BRINE.get<Session>(`session:${code}`, "json") : Promise.resolve(null))
 
-async function respondent(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, invite: Invite, path: string, url: URL) {
+// The walk for admin reads, wherever it is kept.
+async function sessionOf(env: Env, code: string): Promise<Session | null> {
+  if (env.BRINE_SESSIONS) {
+    const res = await env.BRINE_SESSIONS.get(env.BRINE_SESSIONS.idFromName(code)).fetch(`https://brine/internal/session?code=${encodeURIComponent(code)}`)
+    const s = (await res.json()) as Session | null
+    if (s) return s
+  }
+  return env.BRINE.get<Session>(`session:${code}`, "json")
+}
+
+async function respondent(req: Request, env: Env, waitUntil: WaitUntil, walk: Walk, invite: Invite, path: string, url: URL, store: Store) {
   const view = (s: Session) => ({ respondent: invite.name, session: s, ...replay(walk, s), progress: progress(walk, s) })
   const body = async () => (await req.json()) as { q?: string; value?: Answer["value"]; note?: string; voice?: string[]; skipped?: boolean; chapter?: string }
   // The answer as sent, read by Jev when the question asks for decisions.
@@ -112,12 +175,12 @@ async function respondent(req: Request, env: Env, ctx: ExecutionContext, walk: W
       : { value: clean(b.value), note: b.note?.trim() || undefined, voice: b.voice?.length ? b.voice.slice(0, 20) : undefined }
     const node = walk.byId.get(q)!
     const decisions = node.question.decide && !a.skipped ? await decide(env, walk, q, a) : {}
-    if (a.voice?.length) ctx.waitUntil(Promise.all(a.voice.map((id) => transcribe(env, id))))
+    if (a.voice?.length) waitUntil(Promise.all(a.voice.map((id) => transcribe(env, id))))
     return { a, decisions }
   }
   const move = async (fn: (s: Session) => Session) => {
-    const s = fn(await load(env, walk, invite.code))
-    await save(env, invite.code, s)
+    const s = fn(await store.load())
+    await store.save(s)
     return json(view(s))
   }
 
@@ -125,23 +188,23 @@ async function respondent(req: Request, env: Env, ctx: ExecutionContext, walk: W
 
   if (path === "/api/answer" && req.method === "POST") {
     const b = await body()
-    const s = await load(env, walk, invite.code)
+    const s = await store.load()
     // Only the question on screen can be answered-and-moved-on; a second tab or a double press
     // gets the current walk back instead of skipping a question.
     if (!b.q || b.q !== s.at) return json({ ...view(s), stale: true }, 409)
     const { a, decisions } = await take(b.q, b)
     const next = answer(walk, s, b.q, a, decisions)
-    await save(env, invite.code, next)
+    await store.save(next)
     return json(view(next))
   }
 
   if (path === "/api/save" && req.method === "POST") {
     const b = await body()
-    const s = await load(env, walk, invite.code)
+    const s = await store.load()
     if (!b.q || !walk.byId.has(b.q) || !visible(walk, b.q, s)) return json({ ...view(s), stale: true }, 409)
     const { a, decisions } = await take(b.q, b)
     const next = keep(walk, s, b.q, a, decisions)
-    await save(env, invite.code, next)
+    await store.save(next)
     return json(view(next))
   }
 
@@ -170,7 +233,7 @@ async function respondent(req: Request, env: Env, ctx: ExecutionContext, walk: W
     const rec: Recording = { id, code: invite.code, q, type, bytes: body.byteLength, seconds, created: new Date().toISOString() }
     await env.BRINE.put(`voice:${id}`, JSON.stringify(rec))
     // Start transcribing straight away, so a decision on this answer rarely has to wait.
-    ctx.waitUntil(transcribe(env, id))
+    waitUntil(transcribe(env, id))
     return json({ id, seconds })
   }
 
@@ -178,7 +241,7 @@ async function respondent(req: Request, env: Env, ctx: ExecutionContext, walk: W
   if (del && req.method === "DELETE") {
     const rec = await env.BRINE.get<Recording>(`voice:${del[1]}`, "json")
     if (!rec || rec.code !== invite.code) return fail(404, "no such recording")
-    const s = await load(env, walk, invite.code)
+    const s = await store.load()
     // Recordings already part of a submitted answer stay: they are what was said.
     if (Object.values(s.answers).some((a) => a.voice?.includes(rec.id))) return json({ kept: true })
     await Promise.all([env.BRINE.delete(`voice:${rec.id}`), env.BRINE_AUDIO.delete(`audio/${rec.code}/${rec.id}`)])
@@ -295,7 +358,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, 
     const invites = await all<Invite>(env, "invite:")
     const rows = await Promise.all(
       invites.map(async (i) => {
-        const s = await env.BRINE.get<Session>(`session:${i.code}`, "json")
+        const s = await sessionOf(env, i.code)
         return { name: i.name, code: i.code, created: i.created, answered: s ? Object.keys(s.answers).length : 0, at: s ? replay(walk, s).frontier : null, finished: s?.finished ?? null }
       }),
     )
@@ -306,7 +369,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, 
     const invites = await all<Invite>(env, "invite:")
     const people = []
     for (const i of invites) {
-      const s = await env.BRINE.get<Session>(`session:${i.code}`, "json")
+      const s = await sessionOf(env, i.code)
       if (!s) continue
       const asked = []
       for (const id of Object.keys(s.answers).sort((x, y) => (walk.byId.get(x)?.index ?? 0) - (walk.byId.get(y)?.index ?? 0))) {
@@ -344,6 +407,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, walk: Walk, 
     if (!(await env.BRINE.get(`invite:${code}`))) return fail(404, "no such invite")
     const recs = (await all<Recording>(env, "voice:")).filter((r) => r.code === code)
     await Promise.all(recs.flatMap((r) => [env.BRINE.delete(`voice:${r.id}`), env.BRINE_AUDIO.delete(`audio/${code}/${r.id}`)]))
+    if (env.BRINE_SESSIONS) await env.BRINE_SESSIONS.get(env.BRINE_SESSIONS.idFromName(code)).fetch(`https://brine/internal/session`, { method: "DELETE" })
     await Promise.all([env.BRINE.delete(`invite:${code}`), env.BRINE.delete(`session:${code}`)])
     return json({ revoked: code, recordings: recs.length })
   }

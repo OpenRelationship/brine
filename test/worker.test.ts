@@ -179,3 +179,82 @@ describe("worker", () => {
     expect(res.status).toBe(415)
   })
 })
+
+// The same Worker with walks in Durable Objects: a fake namespace that keeps one object per name.
+describe("worker with Durable Object sessions", () => {
+  function namespace() {
+    const objects = new Map<string, { fetch(r: Request): Promise<Response> }>()
+    const stores = new Map<string, Map<string, unknown>>()
+    return {
+      stores,
+      idFromName: (name: string) => name,
+      get(name: string) {
+        if (!objects.has(name)) {
+          const m = new Map<string, unknown>()
+          stores.set(name, m)
+          const state = {
+            storage: { get: async (k: string) => structuredClone(m.get(k)), put: async (k: string, v: unknown) => void m.set(k, structuredClone(v)), deleteAll: async () => m.clear() },
+            waitUntil: (p: Promise<unknown>) => waits.push(p),
+          }
+          objects.set(name, new app.BrineSession(state as unknown as DurableObjectState, env))
+        }
+        const o = objects.get(name)!
+        return { fetch: (input: string | Request, init?: RequestInit) => o.fetch(typeof input === "string" ? new Request(input, init) : input) }
+      },
+    }
+  }
+
+  let ns: ReturnType<typeof namespace>
+  beforeEach(() => {
+    ns = namespace()
+    env.BRINE_SESSIONS = ns as unknown as DurableObjectNamespace
+  })
+
+  test("the walk lives in the respondent's object, not KV", async () => {
+    const code = await invite()
+    await req("/api/answer", { method: "POST", token: code, body: JSON.stringify({ q: "orders/sources", value: ["phone"] }) })
+    expect(((ns.stores.get(code)!.get("session") as any).answers["orders/sources"].value)).toEqual(["phone"])
+    expect([...(env.BRINE as any).m.keys()].some((k: string) => k.startsWith("session:"))).toBeFalse()
+    const ex = (await (await req("/api/admin/export", { token: "admin" })).json()) as any
+    expect(ex.people[0].answers[0].value).toEqual(["phone"])
+  })
+
+  test("saves sent at the same moment all land (no lost update)", async () => {
+    const code = await invite()
+    await req("/api/answer", { method: "POST", token: code, body: JSON.stringify({ q: "orders/sources", value: ["walkin"] }) })
+    // A phone and a laptop saving different questions at once.
+    await Promise.all([
+      req("/api/save", { method: "POST", token: code, body: JSON.stringify({ q: "orders/cutoff", value: "yes" }) }),
+      req("/api/save", { method: "POST", token: code, body: JSON.stringify({ q: "bake/plan", value: "by the weather" }) }),
+      req("/api/save", { method: "POST", token: code, body: JSON.stringify({ q: "bake/waste", value: 4 }) }),
+    ])
+    const s = (await (await req("/api/session", { token: code })).json()) as any
+    expect(Object.keys(s.session.answers).sort()).toEqual(["bake/plan", "bake/waste", "orders/cutoff", "orders/sources"])
+  })
+
+  test("a double press answers once and does not skip a question", async () => {
+    const code = await invite()
+    const [a, b] = await Promise.all([
+      req("/api/answer", { method: "POST", token: code, body: JSON.stringify({ q: "orders/sources", value: ["walkin"] }) }),
+      req("/api/answer", { method: "POST", token: code, body: JSON.stringify({ q: "orders/sources", value: ["walkin"] }) }),
+    ])
+    expect([a.status, b.status].sort()).toEqual([200, 409])
+    const s = (await (await req("/api/session", { token: code })).json()) as any
+    expect(s.session.at).toBe("orders/cutoff")
+  })
+
+  test("a walk saved in KV before the move is picked up, then kept in the object", async () => {
+    const code = await invite()
+    await env.BRINE.put(`session:${code}`, JSON.stringify({ at: "orders/cutoff", answers: { "orders/sources": { value: ["walkin"], at: "t" } }, decisions: {}, started: "t" }))
+    const s = (await (await req("/api/session", { token: code })).json()) as any
+    expect(s.session.at).toBe("orders/cutoff")
+    expect((ns.stores.get(code)!.get("session") as any).answers["orders/sources"].value).toEqual(["walkin"])
+  })
+
+  test("revoking deletes the object's walk", async () => {
+    const code = await invite()
+    await req("/api/answer", { method: "POST", token: code, body: JSON.stringify({ q: "orders/sources", value: ["phone"] }) })
+    await req(`/api/admin/invite/${code}`, { method: "DELETE", token: "admin" })
+    expect(ns.stores.get(code)!.size).toBe(0)
+  })
+})
