@@ -1,10 +1,12 @@
 // How long a sitting takes. Rough on purpose: a respondent deciding whether to start wants "about
-// 20 minutes", not a number to the second. Each kind of question gets a typical time (a long
-// answer is a minute and a half of typing or talking, a choice is a tap), and a walk's time is the
-// sum over the questions it actually asks.
+// 20 minutes", not a number to the second. Each kind of question gets a typical time, and a walk's
+// time is the sum over the questions it actually asks. Calibrated on real sittings: 100 questions
+// take about 30 minutes (18 seconds each on average) with half of them long answers and most of
+// the rest a tap. People answer faster than they would at a desk: a long answer is a few spoken
+// sentences, not an essay.
 
-export const SECONDS: Record<string, number> = { long: 90, text: 30, number: 15, multi: 15, choice: 10, scale: 10 }
-const TYPICAL = 30
+export const SECONDS: Record<string, number> = { long: 30, text: 15, number: 8, multi: 8, choice: 5, scale: 5 }
+export const TYPICAL = 18
 
 /** Seconds for a walk that asks questions of these kinds. */
 export const seconds = (kinds: string[]) => kinds.reduce((n, k) => n + (SECONDS[k] ?? TYPICAL), 0)

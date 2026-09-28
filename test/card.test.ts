@@ -6,9 +6,14 @@ import { duration, minutes, seconds } from "../src/estimate"
 
 describe("estimate", () => {
   test("times a walk by the kinds it asks", () => {
-    expect(seconds(["long", "choice", "text"])).toBe(130)
-    expect(minutes(130)).toBe(5)
+    expect(seconds(["long", "choice", "text"])).toBe(50)
+    expect(minutes(50)).toBe(5)
     expect(minutes(31 * 60)).toBe(35)
+  })
+
+  test("100 questions, half of them long answers, take about 30 minutes (real sittings)", () => {
+    const kinds = [...Array(50).fill("long"), ...Array(40).fill("choice"), ...Array(6).fill("text"), "number", "number", "multi", "multi"]
+    expect(Math.abs(seconds(kinds) / 60 - 30)).toBeLessThan(1)
   })
 
   test("reads as minutes, then hours", () => {
