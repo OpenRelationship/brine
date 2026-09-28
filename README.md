@@ -1,5 +1,7 @@
 # brine
 
+[![skills.sh](https://skills.sh/b/shinyobjectz/brine)](https://skills.sh/shinyobjectz/brine) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 Interviews in, Gherkin out.
 
 brine is a question tree you send to someone who knows a process better than anyone, and can't
