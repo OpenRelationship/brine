@@ -14,6 +14,7 @@
 //   brine ledger check <interview.ts> <ledger.json> [answers.json]  every fact typed and cited; answers no fact cites
 //   brine ledger render <ledger.json> [kind...]                     the facts as markdown, by kind
 //   brine ledger emit <ledger.json> [kind...]                       the facts as a typed TS module for code
+//   brine ledger records <answers.json> <ledger.json|-> <feature>...  one JSONL retrieval record per answer
 //
 // <interview.ts> exports `interview` (or a default). answers.md is what the Gherkin pass reads.
 

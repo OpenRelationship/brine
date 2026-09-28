@@ -1,9 +1,12 @@
 {
   "name": "brine",
   "version": "0.1.0",
-  "description": "Interviews in, Gherkin out. A question tree with voice answers, Jev-judged branches, and a Cloudflare Worker to host it.",
+  "description": "Interviews in, Gherkin out. A question tree with voice answers, model-judged branches and a Cloudflare Worker to host it, plus the loop that turns the answers into Gherkin and a fact ledger.",
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "git+https://github.com/shinyobjectz/brine.git" },
+  "homepage": "https://github.com/shinyobjectz/brine",
+  "keywords": ["interview", "gherkin", "bdd", "requirements", "cloudflare-workers", "agent-skill"],
   "bin": { "brine": "./bin/brine.ts" },
   "exports": {
     "./spec": "./src/spec.ts",
