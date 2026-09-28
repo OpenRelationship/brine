@@ -1,15 +1,40 @@
-<p align="center"><img src="assets/banner.svg" alt="brine: interviews in, Gherkin out" width="100%"></p>
+<p align="center"><img src="assets/banner.webp" alt="brine: model the behavior before you build it" width="100%"></p>
 
 # brine
 
 [![skills.sh](https://skills.sh/b/shinyobjectz/brine)](https://skills.sh/shinyobjectz/brine) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-Interviews in, Gherkin out.
+Model the behavior before you build it.
 
-brine is a question tree you send to someone who knows a process better than anyone, and can't
-describe it. They answer one question at a time, typed or spoken. Their recordings are transcribed on
-the server, a decision model reads each free answer to choose which follow-up to ask, and the
-answers come back as a bundle that Claude turns into `.feature` files.
+Most software gets planned from what people say they want. brine plans it from how the work
+actually happens. You send a question tree to the people who do the work: the operations team a
+new internal tool has to fit, the customers or clients an app is for, the specialist who knows how a
+job is really done. They answer one question at a time, typed or spoken. A model reads each answer to choose
+the next question, so the interview follows what they actually do. Their answers come back as a
+behavior model you can build against:
+
+- **Gherkin scenarios** for how the work flows, each one traced to the answers it came from.
+- **A fact ledger** for everything else they said: numbers, timers, rules, their exact wording, real
+  cases, red flags, terms, wishes, risks and what they measure. Each fact is typed and cited, and
+  can be emitted as constants for code or rendered as a backlog, risk register or playbook.
+
+Use it to:
+
+- **Plan an internal tool and its stack.** Interview the team that runs a process, such as an
+  agency moving a client request to a delivered video: where the request lands (a monday board, a
+  Slack thread, a shared inbox), who approves it, what gets checked before it counts as done, and
+  where it waits. The ledger separates fixed rules that belong in code, judgment calls that need a
+  person (or a model, with evals drawn from real cases), and the systems and records each step
+  reads or writes. That tells you what to build and what to integrate, not a vendor's demo.
+- **Plan an app around a customer, client or user.** Model their process before you design
+  screens. For a clinic's front desk: the states an appointment moves through, the reminder that
+  goes out 48 hours before and who sends it, the no-show rule, and the insurance exceptions staff
+  sort out by phone today.
+- **Write down how a specialist does the job.** A senior estimator pricing a renovation, or a
+  payroll lead closing the month: the inputs they trust, the checks they run and the thresholds
+  they use, in their own words, so the team and its software work to the same spec.
+
+## How it works
 
 - **The tree** (`src/spec.ts`, `src/walk.ts`). Chapters of questions, walked in order. `when` guards
   skip what does not apply, `next` jumps go forward, and `decide` asks

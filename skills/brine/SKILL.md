@@ -1,9 +1,15 @@
 ---
 name: brine
-description: Design, host and harvest a process interview whose answers become Gherkin specs and a fact ledger. Use when the user wants to learn how a client, prospect or expert actually runs their work (a pipeline, an operation, a trade) by sending them a long questionnaire, when they say "brine", "interview questionnaire", "question tree", "turn answers into Gherkin", or want voice answers transcribed and branched on. Covers designing the questions from a vocabulary or pipeline, authoring the tree, deploying it on Cloudflare, inviting the respondent, exporting answers, writing the .feature files, and projecting the answers into typed constants, timers, templates, fixtures, a backlog and a risk register.
+description: Model how work actually happens before building software for it. Interview the people who do the work (a team, a customer, a client, an expert) with a voice question tree, then turn the answers into Gherkin specs and a typed fact ledger. Use when planning an internal tool and its tech stack, planning an app around a customer, client or user, writing down how a specialist does a job, or when the user says "brine", "behavior model", "discovery interview", "requirements interview", "question tree" or "turn answers into Gherkin". Covers designing the questions, hosting the interview on Cloudflare with voice answers, exporting them, writing traced .feature files, and projecting the answers into constants, timers, templates, fixtures, eval cases, a backlog and a risk register.
 ---
 
-# brine: interviews in, Gherkin out
+# brine: model the behavior before you build it
+
+Plan software from how the work actually happens, not from what people say they want. Typical uses:
+
+- **An internal tool.** Interview the team that runs the process (an agency's request-to-delivery flow, a warehouse's returns desk). The answers sort each step into rules (code), judgment calls (a person, or a model with evals from real cases) and hand-offs, and name the systems and records each step touches. That is the stack.
+- **An app around a customer, client or user.** Model their process first: the states a record moves through, the clocks behind reminders, the messages they send, the exceptions they handle by hand.
+- **A specialist's process**, such as an estimator pricing a job or a payroll lead closing the month, written down in their own words so the team and its software work to the same spec.
 
 brine is five things in one repo (https://github.com/shinyobjectz/brine, Apache-2.0):
 

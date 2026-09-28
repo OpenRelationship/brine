@@ -1,12 +1,12 @@
 {
   "name": "brine",
   "version": "0.1.0",
-  "description": "Interviews in, Gherkin out. A question tree with voice answers, model-judged branches and a Cloudflare Worker to host it, plus the loop that turns the answers into Gherkin and a fact ledger.",
+  "description": "Model the behavior before you build it: interview the people who do the work with a voice question tree, then turn the answers into Gherkin specs and a typed fact ledger for planning apps and internal tools.",
   "type": "module",
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/shinyobjectz/brine.git" },
   "homepage": "https://github.com/shinyobjectz/brine",
-  "keywords": ["interview", "gherkin", "bdd", "requirements", "cloudflare-workers", "agent-skill"],
+  "keywords": ["behavior-modeling", "requirements", "product-planning", "ai-agents", "interview", "gherkin", "bdd", "cloudflare-workers", "agent-skill"],
   "bin": { "brine": "./bin/brine.ts" },
   "exports": {
     "./spec": "./src/spec.ts",
