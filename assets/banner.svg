@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400" role="img" aria-labelledby="t d">
+  <title id="t">brine</title>
+  <desc id="d">A jar of pickles in brine next to a pickle holding a microphone. Interviews in, Gherkin out.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBF7E4"/>
+      <stop offset="1" stop-color="#EEF1CF"/>
+    </linearGradient>
+    <linearGradient id="brine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#D9E27A" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#A9C04E" stop-opacity=".9"/>
+    </linearGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5E8F2F"/>
+      <stop offset=".45" stop-color="#7DB042"/>
+      <stop offset="1" stop-color="#4E7C27"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".55"/>
+      <stop offset=".2" stop-color="#FFFFFF" stop-opacity=".05"/>
+      <stop offset=".85" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".35"/>
+    </linearGradient>
+    <clipPath id="jarIn"><rect x="96" y="104" width="228" height="258" rx="34"/></clipPath>
+    <g id="pickle">
+      <rect x="-26" y="-80" width="52" height="160" rx="26" fill="url(#skin)" stroke="#355C1B" stroke-width="3"/>
+      <g fill="#46742A">
+        <circle cx="-10" cy="-50" r="4"/><circle cx="9" cy="-28" r="3.5"/><circle cx="-8" cy="-4" r="4"/>
+        <circle cx="10" cy="20" r="3.5"/><circle cx="-9" cy="44" r="4"/><circle cx="8" cy="62" r="3"/>
+      </g>
+      <rect x="-17" y="-66" width="7" height="118" rx="3.5" fill="#FFFFFF" opacity=".18"/>
+    </g>
+    <g id="dill" fill="none" stroke="#3F6B22" stroke-width="3" stroke-linecap="round">
+      <path d="M0 0 C 2 -30, -4 -60, 0 -90"/>
+      <path d="M0 -30 l -16 -14 M0 -30 l 16 -12 M-1 -55 l -14 -12 M-1 -55 l 14 -12 M0 -78 l -10 -10 M0 -78 l 10 -10"/>
+    </g>
+  </defs>
+
+  <rect width="1280" height="400" rx="28" fill="url(#bg)"/>
+
+  <!-- floating bubbles -->
+  <g fill="none" stroke="#B9CB6A" stroke-width="3" opacity=".7">
+    <circle cx="372" cy="70" r="10"/><circle cx="400" cy="40" r="6"/><circle cx="1230" cy="60" r="12"/>
+    <circle cx="1196" cy="96" r="6"/><circle cx="1010" cy="372" r="7"/><circle cx="880" cy="42" r="7"/>
+    <circle cx="42" cy="330" r="9"/><circle cx="60" cy="60" r="5"/>
+  </g>
+
+  <!-- the jar -->
+  <g>
+    <ellipse cx="210" cy="372" rx="130" ry="12" fill="#2F4A1E" opacity=".12"/>
+    <rect x="96" y="104" width="228" height="258" rx="34" fill="#FFFFFF" fill-opacity=".45" stroke="#6C8A3C" stroke-width="4"/>
+    <g clip-path="url(#jarIn)">
+      <rect x="90" y="150" width="240" height="220" fill="url(#brine)"/>
+      <path d="M90 150 q 30 -10 60 0 t 60 0 t 60 0 t 60 0 v 12 H90z" fill="#E6EC9A" opacity=".8"/>
+      <use href="#dill" transform="translate(300 350) rotate(8)"/>
+      <use href="#pickle" transform="translate(150 270) rotate(-10)"/>
+      <use href="#pickle" transform="translate(212 262) rotate(4) scale(1.05)"/>
+      <use href="#pickle" transform="translate(272 276) rotate(14) scale(.95)"/>
+      <use href="#dill" transform="translate(122 356) rotate(-12) scale(.9)"/>
+      <g fill="#FFFFFF" opacity=".75">
+        <circle cx="130" cy="190" r="4"/><circle cx="182" cy="175" r="3"/><circle cx="245" cy="186" r="5"/>
+        <circle cx="300" cy="200" r="3"/><circle cx="118" cy="330" r="3"/><circle cx="296" cy="318" r="4"/>
+      </g>
+      <rect x="96" y="104" width="228" height="258" fill="url(#glass)"/>
+    </g>
+    <!-- lid -->
+    <rect x="100" y="64" width="220" height="44" rx="10" fill="#3F6B22"/>
+    <g stroke="#2F5118" stroke-width="3">
+      <line x1="112" y1="76" x2="308" y2="76"/><line x1="112" y1="86" x2="308" y2="86"/><line x1="112" y1="96" x2="308" y2="96"/>
+    </g>
+    <!-- label -->
+    <g transform="rotate(-4 210 250)">
+      <rect x="138" y="214" width="144" height="62" rx="10" fill="#FBF7E4" stroke="#6C8A3C" stroke-width="3"/>
+      <text x="210" y="243" text-anchor="middle" font-family="ui-rounded, 'SF Pro Rounded', 'Nunito', 'Trebuchet MS', system-ui, sans-serif" font-size="20" font-weight="800" fill="#2F4A1E" letter-spacing="2">GHERKIN</text>
+      <text x="210" y="264" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="12" fill="#6C8A3C">Feature: answers</text>
+    </g>
+  </g>
+
+  <!-- title -->
+  <g font-family="ui-rounded, 'SF Pro Rounded', 'Nunito', 'Trebuchet MS', system-ui, sans-serif">
+    <text x="400" y="200" font-size="140" font-weight="800" fill="#2F4A1E" letter-spacing="-4">brine</text>
+    <text x="406" y="258" font-size="38" font-weight="700" fill="#4E7C27">Interviews in, Gherkin out.</text>
+    <text x="408" y="304" font-size="21" fill="#6C7A4A">Ask the expert. Let it soak. Get specs with crunch.</text>
+  </g>
+  <g font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="16" fill="#7E8C58">
+    <text x="408" y="346">question tree · voice answers · @q: features · fact ledger</text>
+  </g>
+
+  <!-- the interviewer pickle -->
+  <g transform="translate(1112 238)">
+    <ellipse cx="0" cy="132" rx="64" ry="10" fill="#2F4A1E" opacity=".12"/>
+    <!-- arm holding the mic -->
+    <path d="M-50 20 C -80 10, -92 -6, -96 -30" fill="none" stroke="#355C1B" stroke-width="8" stroke-linecap="round"/>
+    <g transform="translate(-104 -52) rotate(-18)">
+      <rect x="-6" y="10" width="12" height="44" rx="5" fill="#2F3A2A"/>
+      <circle cx="0" cy="0" r="18" fill="#5C6B55" stroke="#2F3A2A" stroke-width="3"/>
+      <path d="M-12 -6 h24 M-14 2 h28 M-12 10 h24" stroke="#2F3A2A" stroke-width="2"/>
+    </g>
+    <!-- other arm waving -->
+    <path d="M50 10 C 80 0, 88 -20, 98 -44" fill="none" stroke="#355C1B" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="99" cy="-48" r="8" fill="#7DB042" stroke="#355C1B" stroke-width="3"/>
+    <!-- body -->
+    <rect x="-58" y="-120" width="116" height="250" rx="58" fill="url(#skin)" stroke="#355C1B" stroke-width="4"/>
+    <g fill="#46742A">
+      <circle cx="-30" cy="-80" r="6"/><circle cx="32" cy="-60" r="5"/><circle cx="-36" cy="40" r="6"/>
+      <circle cx="30" cy="70" r="5"/><circle cx="-10" cy="100" r="5"/><circle cx="36" cy="10" r="4"/>
+    </g>
+    <rect x="-40" y="-100" width="12" height="190" rx="6" fill="#FFFFFF" opacity=".18"/>
+    <!-- face -->
+    <circle cx="-20" cy="-50" r="15" fill="#FFFFFF" stroke="#2F4A1E" stroke-width="3"/>
+    <circle cx="22" cy="-50" r="15" fill="#FFFFFF" stroke="#2F4A1E" stroke-width="3"/>
+    <circle cx="-16" cy="-47" r="7" fill="#1E2A14"/><circle cx="26" cy="-47" r="7" fill="#1E2A14"/>
+    <circle cx="-13" cy="-50" r="2.5" fill="#FFFFFF"/><circle cx="29" cy="-50" r="2.5" fill="#FFFFFF"/>
+    <ellipse cx="-36" cy="-18" rx="10" ry="6" fill="#F29C8F" opacity=".7"/>
+    <ellipse cx="38" cy="-18" rx="10" ry="6" fill="#F29C8F" opacity=".7"/>
+    <path d="M-18 -16 Q 2 6, 22 -16" fill="#8E2F2A" stroke="#2F4A1E" stroke-width="3" stroke-linejoin="round"/>
+    <!-- a little dill sprig hat -->
+    <use href="#dill" transform="translate(4 -116) scale(.55)"/>
+  </g>
+
+  <!-- speech bubble -->
+  <g font-family="ui-rounded, 'SF Pro Rounded', 'Nunito', 'Trebuchet MS', system-ui, sans-serif" font-size="17" font-weight="700" fill="#2F4A1E" text-anchor="middle">
+    <path d="M846 34 h190 a18 18 0 0 1 18 18 v40 a18 18 0 0 1 -18 18 h-26 l10 30 l-40 -30 h-134 a18 18 0 0 1 -18 -18 v-40 a18 18 0 0 1 18 -18z" fill="#FFFFFF" stroke="#6C8A3C" stroke-width="3"/>
+    <text x="941" y="66">Tell me about the last</text>
+    <text x="941" y="90">time it went wrong.</text>
+  </g>
+</svg>
