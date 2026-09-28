@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/banner.svg" alt="brine: interviews in, Gherkin out" width="100%"></p>
+
 # brine
 
 [![skills.sh](https://skills.sh/b/shinyobjectz/brine)](https://skills.sh/shinyobjectz/brine) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
