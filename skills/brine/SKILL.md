@@ -75,7 +75,7 @@ An interview is a loop, not a form. The first round finds the process; the loop 
 
 Every invite is a link, and its preview is the first thing a respondent sees. `brine card <interview.ts> --company <who it is for>` writes `card.svg` and `card.png`: the company (with `--mark` its logo), a heading (default the interview's title; write one in the respondent's terms, an invitation rather than a form name), a line of body, and three facts: the time a sitting takes, the number of questions, and that they can pause. Put `card.png` next to the page and add the tags the command prints (`og:image` must be an absolute URL; previews do not render SVG).
 
-The time comes from `src/estimate.ts`: each kind of question has a typical time (a long answer about 90 seconds, a choice about 10), summed over sampled walks and rounded to five minutes. It is a range on purpose. Use the same words in the welcome so the card and the page agree. A host app whose questions are not a brine interview can still use it: `brine/card` (`card`, `png`) and `brine/estimate` (`SECONDS`, `minutes`, `duration`) import nothing else, and `png` accepts the host's own `Resvg` and font files.
+The time comes from `src/estimate.ts`: each kind of question has a typical time (a long answer about 30 seconds, a choice about 5), calibrated on real sittings where 100 questions took about 30 minutes, summed over sampled walks and rounded to five minutes. It is a range on purpose. Use the same words in the welcome so the card and the page agree. A host app whose questions are not a brine interview can still use it: `brine/card` (`card`, `png`) and `brine/estimate` (`SECONDS`, `TYPICAL`, `minutes`, `duration`) import nothing else, and `png` accepts the host's own `Resvg` and font files.
 
 ## Hosting
 
