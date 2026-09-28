@@ -42,6 +42,7 @@ Run as `bun <brine>/bin/brine.ts <command>`. Commands that take a URL need `BRIN
 | --- | --- |
 | `check <interview.ts>` | lint the tree (addresses resolve, jumps go forward, guards look back) and estimate a sitting's length |
 | `outline <interview.ts>` | every question with its guard, why and yields, as markdown to show the user |
+| `card <interview.ts> --company <name>` | the share card (`card.png`, 1200×630) for the invite link: the company, the heading, and how long a sitting takes; `--heading`, `--body`, `--mark logo`, `--font file.ttf`, `--out dir` |
 | `invite <url> <name>` | make an invite link for a respondent |
 | `passcode <url> <code> <passcode>` | let that respondent in by typing a passcode on the bare site |
 | `status <url>` | who is how far |
@@ -60,7 +61,7 @@ Run as `bun <brine>/bin/brine.ts <command>`. Commands that take a URL need `BRIN
 An interview is a loop, not a form. The first round finds the process; the loop turns it into specs (behavior) and a fact ledger (everything else) that every other artifact is projected from. Stop early and you ship guesses.
 
 1. **Frame.** Ask the user who the respondent is, what the answers are for, and what the vocabulary is (an ontology, a glossary, a pipeline, a brief). Read the sources. Write down the known contradictions. If the host repo has a vocabulary tool (e.g. `monty onto check`), use the repo's words in `why` and `yields`.
-2. **First round.** Plan the chapters from the process, in the order work flows (`references/method.md`), show the user the chapter list with a budget, write the tree (`ask`, `context`, `hint`, `why`, `yields`; see `example/src/interview.ts` in the repo), `brine check` it, host it (see "Hosting"), invite (`brine invite`), watch (`brine status`), and harvest (`brine transcribe`, then `brine export <url> <dir>`).
+2. **First round.** Plan the chapters from the process, in the order work flows (`references/method.md`), show the user the chapter list with a budget, write the tree (`ask`, `context`, `hint`, `why`, `yields`; see `example/src/interview.ts` in the repo), `brine check` it (it prints how long a sitting takes; tell the user, and trim if it runs past what the respondent will give), host it (see "Hosting"), make the share card (see "The share card") so the link says who it is for and how long it takes, invite (`brine invite`), watch (`brine status`), and harvest (`brine transcribe`, then `brine export <url> <dir>`).
 3. **As-is Gherkin.** From `answers.md`, following `references/gherkin.md`: one feature per chapter, the respondent's words, `# TODO:` for every gap, `# IDEA:` for wishes, `# CONFLICT:` where answers disagree with each other or the documents. Tag every scenario (or the Feature line, for its description and notes) with the questions it came from: `@q:<chapter>/<question>`. Then `brine trace <interview.ts> answers.json <features…>` must show no unknown tags and no answered question left uncited.
 4. **Fact ledger.** With the transcript open, walk every answer again for what is not behavior and write it to `ledger.json` as typed facts, each citing its questions (`references/derivations.md`). Never invent a value: vague or disputed becomes `status: "open"` with the quote. `brine ledger check <interview.ts> ledger.json answers.json` must pass.
 5. **Rulings.** Each `# CONFLICT:` and each blocking `open` fact is a decision for whoever owns it (usually the user), asked as one question with a recommendation. Record the answer as `# RULED: <ruling> (<who>, <date>)` under the conflict and as `status: "ruled"` on the fact, and update the vocabulary. A ruled conflict is settled; `brine followup` stops listing it.
@@ -69,6 +70,12 @@ An interview is a loop, not a form. The first round finds the process; the loop 
 8. **Project.** `brine ledger emit` the kinds code reads into a typed module (with a drift test), build policy and lifecycle timers on it, `render` the backlog, risk register, glossary and playbook, `records` the answers for retrieval, and turn stories into fixtures and eval cases. The ranking and the checks are in `references/derivations.md`.
 9. **Follow-ups, only if they block.** The respondent's time is the scarcest input. Ask again only for `open` facts that block what is being built next, batched into a few questions by text. A full second round (`brine followup <id> <title> <features…>`: a read-back per feature and a question per TODO, rewritten in their words, 10–20 questions, hosted as its own Worker) is for when the first round missed a whole area or the owner wants the rules confirmed. The respondent sees rules in plain language, never Gherkin or the ledger.
 10. **Only then**, failing test targets and implementation. Answers to follow-ups become `# RULED:` notes, ledger edits and a fresh emit first.
+
+## The share card
+
+Every invite is a link, and its preview is the first thing a respondent sees. `brine card <interview.ts> --company <who it is for>` writes `card.svg` and `card.png`: the company (with `--mark` its logo), a heading (default the interview's title; write one in the respondent's terms, an invitation rather than a form name), a line of body, and three facts: the time a sitting takes, the number of questions, and that they can pause. Put `card.png` next to the page and add the tags the command prints (`og:image` must be an absolute URL; previews do not render SVG).
+
+The time comes from `src/estimate.ts`: each kind of question has a typical time (a long answer about 90 seconds, a choice about 10), summed over sampled walks and rounded to five minutes. It is a range on purpose. Use the same words in the welcome so the card and the page agree. A host app whose questions are not a brine interview can still use it: `brine/card` (`card`, `png`) and `brine/estimate` (`SECONDS`, `minutes`, `duration`) import nothing else, and `png` accepts the host's own `Resvg` and font files.
 
 ## Hosting
 

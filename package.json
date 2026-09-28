@@ -16,7 +16,9 @@
     "./ledger": "./src/ledger.ts",
     "./worker": "./src/worker.ts",
     "./ui": "./src/ui/Brine.tsx",
-    "./ui/brine.css": "./src/ui/brine.css"
+    "./ui/brine.css": "./src/ui/brine.css",
+    "./card": "./src/card.ts",
+    "./estimate": "./src/estimate.ts"
   },
   "scripts": {
     "test": "bun test",
@@ -26,6 +28,7 @@
     "example:worker": "wrangler dev --config example/wrangler.jsonc"
   },
   "peerDependencies": { "react": ">=18", "react-dom": ">=18" },
+  "optionalDependencies": { "@resvg/resvg-js": "^2.6.2" },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260918.1",
     "@types/bun": "^1.3.0",

@@ -117,6 +117,17 @@ wrangler secret put BRINE_ADMIN_TOKEN
 bun run example:build && wrangler deploy --config example/wrangler.jsonc
 ```
 
+### Share it
+
+```sh
+bun bin/brine.ts card example/src/interview.ts --company "Sam's Bakery" --mark logo.svg --out public
+```
+
+writes `public/card.png`, the link preview for the invite: who the interview is for, a heading,
+how long a sitting takes (estimated from the kinds of questions a walk asks) and how many
+questions. Serve it next to the page and point `og:image` at its absolute URL; the command prints
+the tags. It needs the optional `@resvg/resvg-js`.
+
 ### Run it
 
 ```sh
