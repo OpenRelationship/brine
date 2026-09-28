@@ -9,6 +9,8 @@
     "./spec": "./src/spec.ts",
     "./walk": "./src/walk.ts",
     "./check": "./src/check.ts",
+    "./loop": "./src/loop.ts",
+    "./ledger": "./src/ledger.ts",
     "./worker": "./src/worker.ts",
     "./ui": "./src/ui/Brine.tsx",
     "./ui/brine.css": "./src/ui/brine.css"

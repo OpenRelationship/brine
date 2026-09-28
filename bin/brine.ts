@@ -11,6 +11,9 @@
 //   brine revoke <url> <code>             delete an invite, its answers and its recordings
 //   brine trace <interview.ts> <answers.json> <feature>...   @q: tags resolve; answers no scenario cites
 //   brine followup <id> <title> <feature>...                  draft round two (read-backs + TODOs) as TS
+//   brine ledger check <interview.ts> <ledger.json> [answers.json]  every fact typed and cited; answers no fact cites
+//   brine ledger render <ledger.json> [kind...]                     the facts as markdown, by kind
+//   brine ledger emit <ledger.json> [kind...]                       the facts as a typed TS module for code
 //
 // <interview.ts> exports `interview` (or a default). answers.md is what the Gherkin pass reads.
 
@@ -18,6 +21,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { check } from "../src/check"
 import { followup, scan, source, trace } from "../src/loop"
+import { checkLedger, emitLedger, KINDS, renderLedger, type FactKind, type Ledger } from "../src/ledger"
 import type { Condition, Interview } from "../src/spec"
 
 const [cmd, ...args] = process.argv.slice(2)
@@ -111,6 +115,39 @@ async function main() {
     console.error(`${f.interview.chapters.length} chapters, ${n} draft questions. Conflicts are rulings for the owner, not questions:`)
     for (const c of f.conflicts) console.error(`  ${c.path}:${c.line}  ${c.text}`)
     return
+  }
+
+  if (cmd === "ledger") {
+    const [sub, ...rest] = args
+    if (sub === "check") {
+      const [file, ledgerFile, answersFile] = rest
+      const i = await load(file)
+      const ledger = (await Bun.file(ledgerFile).json()) as Ledger
+      const exp = answersFile ? await Bun.file(answersFile).json() : { people: [] }
+      const answered: string[] = exp.people.flatMap((p: { answers: { id: string; skipped: boolean; applies: boolean }[] }) => p.answers.filter((a) => !a.skipped && a.applies).map((a) => a.id))
+      const r = checkLedger(ledger, i, [...new Set(answered)])
+      for (const e of r.errors) console.log(`ERROR  ${e}`)
+      for (const w of r.warnings) console.log(`warn   ${w}`)
+      console.log(`${ledger.facts.length} facts: ${Object.entries(r.byKind).map(([k, n]) => `${n} ${k}`).join(", ")}`)
+      console.log(`status: ${Object.entries(r.byStatus).map(([k, n]) => `${n} ${k}`).join(", ")}`)
+      if (answersFile) console.log(`${r.uncited.length} answered questions no fact cites${r.uncited.length ? ` (fine when a scenario covers them): ${r.uncited.join(" ")}` : ""}`)
+      process.exit(r.errors.length ? 1 : 0)
+    }
+    if (sub === "render") {
+      const [ledgerFile, ...kinds] = rest
+      const bad = kinds.filter((k) => !(KINDS as readonly string[]).includes(k))
+      if (bad.length) throw new Error(`unknown kind ${bad.join(", ")}; kinds are ${KINDS.join(", ")}`)
+      console.log(renderLedger((await Bun.file(ledgerFile).json()) as Ledger, kinds.length ? (kinds as FactKind[]) : undefined))
+      return
+    }
+    if (sub === "emit") {
+      const [ledgerFile, ...kinds] = rest
+      const bad = kinds.filter((k) => !(KINDS as readonly string[]).includes(k))
+      if (bad.length) throw new Error(`unknown kind ${bad.join(", ")}`)
+      process.stdout.write(emitLedger((await Bun.file(ledgerFile).json()) as Ledger, ledgerFile, kinds.length ? (kinds as FactKind[]) : undefined))
+      return
+    }
+    throw new Error("brine ledger check|render|emit")
   }
 
   if (cmd === "invite") {
