@@ -18,6 +18,11 @@ behavior model you can build against:
   cases, red flags, terms, wishes, risks and what they measure. Each fact is typed and cited, and
   can be emitted as constants for code or rendered as a backlog, risk register or playbook.
 
+<p align="center"><img src="assets/answer-to-gherkin.webp" alt="A respondent's answer in the brine interview page, with lines from highlighted phrases to what they become: the decision model opening a follow-up, two traced Gherkin scenarios, typed ledger facts, and an open fact" width="100%"></p>
+
+One typed or spoken answer becomes a follow-up question, traced scenarios, typed facts, and an open
+question where the respondent was vague, instead of a guess.
+
 Use it to:
 
 - **Plan an internal tool and its stack.** Interview the team that runs a process, such as an
