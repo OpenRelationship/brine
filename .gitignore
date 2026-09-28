@@ -3,3 +3,4 @@ dist
 .wrangler
 .brine
 *.local.*
+.dev.vars

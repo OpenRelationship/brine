@@ -61,7 +61,8 @@
 .brine *::after {
   box-sizing: border-box;
 }
-.brine button {
+:where(.brine button) {
+  /* no specificity, so every button class below sets its own color */
   font: inherit;
   color: inherit;
 }
