@@ -10,6 +10,7 @@ brine is three things in one repo:
 1. **A question tree** (`src/spec.ts`, `src/walk.ts`): chapters of questions walked in order. `when` guards skip what does not apply, `next` jumps leave early, and `decide` asks Jev (`typesafe/jev-1.13`, OpenRouter's Decisions API) typed questions about a free answer so later guards can branch on what was said.
 2. **A respondent page** (`src/ui`): one question at a time, typed or spoken. The waveform button in the answer box records; the recording is transcribed on the server by a speech-to-text model and never shown back.
 3. **A Worker** (`src/worker.ts`): invite links, the walk, recordings in R2, transcripts and decisions in KV, and an admin export.
+4. **The loop** (`src/loop.ts`): `brine trace` ties as-is Gherkin back to the answers; `brine followup` drafts the second round from what is still open.
 
 The respondent never sees Gherkin, reasons or branch logic. Gherkin is written afterwards, by you, from the export.
 
@@ -17,14 +18,16 @@ The repo lives at `~/brine` (github.com/shinyobjectz/brine). Read `references/me
 
 ## The workflow
 
-1. **Frame.** Ask the user who the respondent is, what the answers are for, and what the vocabulary is (an ontology, a glossary, a pipeline, a brief). Read the sources. If the host repo has a vocabulary tool (e.g. `monty onto check`), use the repo's words in `why` and `yields`.
-2. **Plan the chapters** from the process, in the order work flows (`references/method.md`, "Chapters"). Show the user the chapter list with a question budget per chapter before writing questions.
-3. **Write the tree** as a TypeScript module exporting `interview: Interview` (see `example/src/interview.ts`). Every question has `ask`, `context` (the scene, shown under it) and usually `hint` (ways to think about it, shown at the bottom), plus the designer-only `why` (the indirect aim) and `yields` (its Gherkin target). Use the question patterns in the method.
-4. **Check it**: `bun ~/brine/bin/brine.ts check <file>` must print no errors. Read the sampled walk length; for one sitting keep the median under ~60, and for a deep process interview meant for several sittings 150–220 is fine. `brine outline <file>` prints the tree for the user to review.
-5. **Host it.** Mount the Worker and the page (see "Hosting"), create the KV namespace and R2 bucket, set `OPENROUTER_API_KEY` and `BRINE_ADMIN_TOKEN`, and deploy with wrangler.
-6. **Invite**: `BRINE_ADMIN_TOKEN=… bun ~/brine/bin/brine.ts invite <url> "<Name>"` prints the link to send. `brine status <url>` shows progress.
-7. **Harvest**: `brine export <url> <dir>` writes `answers.json` and `answers.md` (every asked question with why, yields, the answer, verbatim transcripts and Jev's reads). If recordings lack transcripts, run `brine transcribe <url>` first.
-8. **Write the Gherkin** from `answers.md` following `references/gherkin.md`: one feature per chapter or process, the respondent's words in the steps, open questions as `# TODO` comments, never invented rules. Then list what the answers contradicted or left open, as follow-up questions for a second, much shorter interview.
+An interview is a loop, not a form. The first round finds the process; the loop turns it into specs the respondent has confirmed. Stop early and you ship guesses.
+
+1. **Frame.** Ask the user who the respondent is, what the answers are for, and what the vocabulary is (an ontology, a glossary, a pipeline, a brief). Read the sources. Write down the known contradictions. If the host repo has a vocabulary tool (e.g. `monty onto check`), use the repo's words in `why` and `yields`.
+2. **First round.** Plan the chapters from the process, in the order work flows (`references/method.md`), show the user the chapter list with a budget, write the tree (`ask`, `context`, `hint`, `why`, `yields`; see `example/src/interview.ts`), `brine check` it, host it (see "Hosting"), invite (`brine invite`), watch (`brine status`), and harvest (`brine transcribe`, then `brine export <url> <dir>`).
+3. **As-is Gherkin.** From `answers.md`, following `references/gherkin.md`: one feature per chapter, the respondent's words, `# TODO:` for every gap, `# IDEA:` for wishes, `# CONFLICT:` where answers disagree with each other or the documents. Tag every scenario (or the Feature line, for its description and notes) with the questions it came from: `@q:<chapter>/<question>`. Then `brine trace <interview.ts> answers.json <features…>` must show no unknown tags and no answered question left uncited.
+4. **Rulings.** Each `# CONFLICT:` is a decision for whoever owns it (usually the user), asked as one question with a recommendation. Record the answer under it as `# RULED: <ruling> (<who>, <date>)` and update the vocabulary. A ruled conflict is settled; `brine followup` stops listing it.
+5. **Product specs.** Write what the software must do, with concrete example values, in the vocabulary's words. Rulings go here; ideas do not.
+6. **Step pass.** Fit the product specs onto one shared set of steps (records, stages, time, fields, flags, events, drafts, next-actions) and check every sentence binds; see `references/gherkin.md`, "The step pass". A step that cannot be bound without inventing something, or a number nobody said, becomes a question for round two, never a guess.
+7. **Second round and read-back.** `brine followup <id> <title> <features…>` drafts it: one read-back per feature (its Rules as a list under "Is this how it works?") and one question per TODO. Rewrite every draft ask in the respondent's words, add the step pass's questions, cut to 10–20 questions beyond the read-backs, and add a read-back of the rulings that change their day. Host it as its own Worker so the rounds never mix. The respondent sees rules in plain language, never Gherkin.
+8. **Only then**, failing test targets and implementation. Corrections from round two become `# RULED:` notes and spec edits first.
 
 ## Hosting
 

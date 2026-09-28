@@ -15,6 +15,8 @@ what is still open.
 - **Examples are evidence.** A story ("the Toyota store that…") becomes a Scenario or an Examples row,
   not a rule. A rule needs the respondent to have said it generally or shown it twice.
 - **Jev's reads are hints.** A decision says which branch the walk took; it is not a finding.
+- **Every scenario cites its answers.** Put `@q:<chapter>/<question>` tags on each scenario, and on the
+  Feature line for answers its description or notes draw on. `brine trace` checks them.
 
 ## Shape
 
@@ -62,12 +64,49 @@ Feature: Reaching dealers
 - **Glossary**: a `words.feature` (or a comment block) with each term as the respondent defined it,
   flagged where it differs from the designer's vocabulary.
 
+## Markers
+
+Comments carry what is not yet a rule. `brine followup` reads them; indent a marker under the scenario
+it belongs to, or at the feature's own indent for the feature as a whole.
+
+| Marker | Means | Goes to |
+| --- | --- | --- |
+| `# TODO:` | the respondent did not say, or said it vaguely | a question in round two |
+| `# IDEA:` | something they want but do not do | the backlog; never a rule |
+| `# CONFLICT:` | two sources disagree | the owner, as one question with a recommendation |
+| `# RULED:` | the owner's ruling, with who and when, right under its CONFLICT | settles it; the specs follow it |
+
+## Two layers
+
+The as-is features describe how the respondent works today, in their words. They are not a contract.
+The product features describe what the software must do; they cite the as-is feature they come from,
+carry the rulings, and use concrete example values. Keep them in separate folders.
+
+## The step pass
+
+Before any product feature becomes a test, fit it onto one shared set of steps and prove every
+sentence binds. Prose Gherkin binds one sentence to one step: 400 sentences, 400 step bodies. A shared
+set of 60–80 steps about records, stages, time, fields, flags, events, drafts and next-actions binds
+them all, and the act of fitting finds the gaps:
+
+- **The same thing said several ways** ("a deal in stage X", "the deal is in stage X") collapses to one step.
+- **A value baked into the sentence** becomes a parameter; the word for the field, the command or the
+  flag becomes a vocabulary word (check it; a word the vocabulary lacks is added, a ruled word replaced).
+- **An unobservable Then** ("the client is told…", "the owner is warned…") becomes a draft, a flag, an
+  event or a next-action someone can see. If none fits, it is a question, not a step.
+- **A number nobody said** (a threshold, a milestone, a limit) is a round-two question.
+
+Measure it: sentences, steps used, sentences per step, unbound sentences (must be 0), and the words the
+steps pass. Keep the step bodies pending until the respondent has read the rules back; a binding
+check stays green meanwhile, and the failing targets come at the end of the loop.
+
 ## After writing
 
 1. Run the host repo's Gherkin checker, if any (e.g. `just context feature check`).
 2. List, for the user:
    - contradictions between answers, and between answers and the documents;
-   - every `# TODO`, grouped into a short follow-up interview (10–20 questions, same method);
+   - every `# TODO`, grouped into a short follow-up interview (10–20 questions, same method;
+     `brine followup` drafts it);
    - words the respondent used that the vocabulary lacks, and vocabulary words they never used.
 3. Do not ship the features as the contract until the respondent has read them back. Send them in
    plain language (a short document or a read-through call), not as Gherkin.
