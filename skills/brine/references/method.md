@@ -114,6 +114,15 @@ poorly.
 - Each question's `why` names the process fact, rule, word or edge case it is after. Each `yields`
   names its Gherkin target: `Feature: … — Rule: …`, `Scenario: …`, `Example rows: …`, `Glossary`.
 
+## The second round
+
+Round two is short and mostly confirmation. Open each part of the process with a read-back: its rules
+as a bulleted list (`context` may be a list) under "Is this how it works?", with "Yes / Mostly / No"
+and a note. Follow it with that part's gaps, each rewritten from the TODO into a real question with
+context: what they said last time, and what is still missing. Choice questions with a note suit gaps
+that hide a number or a rule. End with a read-back of the rulings that will change their day. Run it
+as its own Worker (a second wrangler environment) so the rounds' answers never mix.
+
 ## Review with the user
 
 Before deploying, show the user `brine outline` (or the chapter list with counts and five sample

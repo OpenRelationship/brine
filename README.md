@@ -20,6 +20,9 @@ answers come back as a bundle that Claude turns into `.feature` files.
   KV, recordings in R2, transcription through OpenRouter's speech-to-text endpoint
   (`openai/gpt-4o-mini-transcribe` by default), decisions through OpenRouter's Decisions API, and an
   admin export.
+- **The loop** (`src/loop.ts`). What happens after the first round: `brine trace` ties every
+  as-is scenario back to the answers it came from (`@q:` tags) and lists answers nothing cites;
+  `brine followup` drafts the second round from the features' Rules (read-backs) and `# TODO`s.
 - **The skill** (`skills/brine`). A Claude Code skill: how to design the questions from a vocabulary
   or pipeline (`references/method.md`), and how to write Gherkin from the answers
   (`references/gherkin.md`).
@@ -104,3 +107,17 @@ transcripts and Jev's reads. Hand it to Claude with the skill loaded and ask for
 Kinds: `long`, `text`, `choice`, `multi`, `number`, `scale`. Guards: `is`, `not`, `answered`,
 `atLeast`, `decision`, and `all` / `any` / `none`. A decision's `fallback` is used when there is no
 model, so pick the result that asks more.
+
+### Close the loop
+
+The first round is not the end. Write the as-is features from `answers.md` with `@q:` tags and
+`# TODO` / `# IDEA` / `# CONFLICT` markers, rule on the conflicts (`# RULED:`), write the product
+specs, fit them onto a shared step set, then send a short second round that reads the rules back:
+
+```sh
+bun bin/brine.ts trace questions.ts answers/answers.json features/**/*.feature   # every @q: resolves, every answer cited
+bun bin/brine.ts followup round-2 "Did we get it right?" features/**/*.feature > round2.ts   # draft; rewrite in their words
+```
+
+The eight steps are in `skills/brine/SKILL.md`; the markers and the step pass in
+`skills/brine/references/gherkin.md`.
