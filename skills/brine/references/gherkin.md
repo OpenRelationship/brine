@@ -71,7 +71,7 @@ it belongs to, or at the feature's own indent for the feature as a whole.
 
 | Marker | Means | Goes to |
 | --- | --- | --- |
-| `# TODO:` | the respondent did not say, or said it vaguely | a question in round two |
+| `# TODO:` | the respondent did not say, or said it vaguely | an `open` fact in the ledger; a follow-up only if it blocks |
 | `# IDEA:` | something they want but do not do | the backlog; never a rule |
 | `# CONFLICT:` | two sources disagree | the owner, as one question with a recommendation |
 | `# RULED:` | the owner's ruling, with who and when, right under its CONFLICT | settles it; the specs follow it |
@@ -94,7 +94,8 @@ them all, and the act of fitting finds the gaps:
   flag becomes a vocabulary word (check it; a word the vocabulary lacks is added, a ruled word replaced).
 - **An unobservable Then** ("the client is told…", "the owner is warned…") becomes a draft, a flag, an
   event or a next-action someone can see. If none fits, it is a question, not a step.
-- **A number nobody said** (a threshold, a milestone, a limit) is a round-two question.
+- **A number nobody said** (a threshold, a milestone, a limit) is an `open` fact, asked only if it blocks.
+- **A number somebody did say** is read from the ledger's emitted module, never typed into a step.
 
 Measure it: sentences, steps used, sentences per step, unbound sentences (must be 0), and the words the
 steps pass. Keep the step bodies pending until the respondent has read the rules back; a binding
@@ -105,8 +106,8 @@ check stays green meanwhile, and the failing targets come at the end of the loop
 1. Run the host repo's Gherkin checker, if any (e.g. `just context feature check`).
 2. List, for the user:
    - contradictions between answers, and between answers and the documents;
-   - every `# TODO`, grouped into a short follow-up interview (10–20 questions, same method;
-     `brine followup` drafts it);
+   - every `# TODO` as an `open` fact, and which of them block the next build (those are the
+     follow-ups; a full second round only when a whole area is missing, `brine followup` drafts it);
    - words the respondent used that the vocabulary lacks, and vocabulary words they never used.
 3. Do not ship the features as the contract until the respondent has read them back. Send them in
    plain language (a short document or a read-through call), not as Gherkin.

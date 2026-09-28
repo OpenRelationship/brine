@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { interview } from "../example/src/interview"
-import { checkLedger, emitLedger, fact, renderLedger, type Ledger } from "../src/ledger"
+import { answerRecords, checkLedger, emitLedger, fact, renderLedger, type Ledger } from "../src/ledger"
+import { scan } from "../src/loop"
 
 const ledger: Ledger = {
   interview: "bakery",
@@ -54,5 +55,31 @@ describe("ledger", () => {
     expect(ts).toContain('"wholesale-min"')
     expect(ts).not.toContain('"flour-risk"')
     expect(ts).toContain("export type FactId = keyof typeof FACTS")
+  })
+})
+
+describe("answer records", () => {
+  test("one per live answer, with the respondent's words and what cites it", () => {
+    const feature = `@q:orders/sources\nFeature: Orders\n\n  @q:orders/cutoff\n  Scenario: a late order\n    Given an order at 3pm\n`
+    const exp = {
+      people: [
+        {
+          name: "Sam",
+          answers: [
+            { id: "orders/cutoff", chapter: "Orders", ask: "When do orders close?", skipped: false, applies: true, value: "2pm", note: "the day before", recordings: [{ transcript: "two, the day before" }] },
+            { id: "orders/sources", chapter: "Orders", ask: "Where do orders come from?", skipped: false, applies: true, recordings: [] },
+            { id: "orders/wholesale", chapter: "Orders", ask: "Wholesale?", skipped: true, applies: true, recordings: [] },
+            { id: "orders/old", chapter: "Orders", ask: "Old branch", skipped: false, applies: false, value: "x", recordings: [] },
+          ],
+        },
+      ],
+    }
+    const rs = answerRecords(exp, [scan(feature, "orders.feature")], ledger)
+    expect(rs.map((r) => r.id)).toEqual(["orders/cutoff", "orders/sources"])
+    expect(rs[0].said).toBe("2pm\n\nthe day before\n\ntwo, the day before")
+    expect(rs[0].scenarios).toEqual(["Orders: a late order"])
+    expect(rs[0].facts).toEqual(["cutoff"])
+    expect(rs[1].scenarios).toEqual(["Orders: (feature)"])
+    expect(rs[1].facts).toEqual(["flour-risk"])
   })
 })

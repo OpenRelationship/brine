@@ -15,6 +15,7 @@
 // A fact is `said` (in the answers), `ruled` (the owner decided it) or `open` (unclear or disputed;
 // it needs a ruling or a question before anything is built on it).
 
+import type { Scan } from "./loop"
 import type { Interview } from "./spec"
 
 export const KINDS = ["number", "timer", "rule", "template", "story", "signal", "term", "idea", "risk", "metric"] as const
@@ -155,4 +156,51 @@ export function emitLedger(ledger: Ledger, from: string, kinds: FactKind[] = [..
     "export type FactId = keyof typeof FACTS",
     "",
   ].join("\n")
+}
+
+// One exported answer, as `brine export` writes it to answers.json.
+export interface ExportedAnswer {
+  id: string
+  chapter: string
+  ask: string
+  skipped: boolean
+  applies: boolean
+  value?: unknown
+  label?: string | string[]
+  note?: string
+  recordings: { transcript: string | null }[]
+}
+
+// One retrieval record per answer: what was asked, what the respondent said in their own words, and
+// every scenario and fact that cites it. An agent or a person searching "what did they say about X"
+// gets the words and where they went; a record no scenario or fact cites is a gap in the specs.
+export interface AnswerRecord {
+  id: string
+  respondent: string
+  chapter: string
+  ask: string
+  said: string
+  scenarios: string[] // "<feature>: <scenario>"
+  facts: string[] // ledger fact ids
+}
+
+export function answerRecords(exp: { people: { name: string; answers: ExportedAnswer[] }[] }, scans: Scan[], ledger?: Ledger): AnswerRecord[] {
+  const out: AnswerRecord[] = []
+  for (const p of exp.people) {
+    for (const a of p.answers) {
+      if (a.skipped || a.applies === false) continue
+      const said = [
+        a.label !== undefined ? [a.label].flat().join(", ") : a.value !== undefined && String(a.value).trim() ? String(a.value) : "",
+        a.note ?? "",
+        ...a.recordings.map((r) => r.transcript ?? ""),
+      ].filter((x) => x.trim()).join("\n\n")
+      const scenarios = scans.flatMap((s) => [
+        ...(s.sources.includes(a.id) ? [`${s.feature}: (feature)`] : []),
+        ...s.scenarios.filter((c) => c.sources.includes(a.id)).map((c) => `${s.feature}: ${c.name}`),
+      ])
+      const facts = (ledger?.facts ?? []).filter((f) => f.sources.includes(a.id)).map((f) => f.id)
+      out.push({ id: a.id, respondent: p.name, chapter: a.chapter, ask: a.ask, said, scenarios, facts })
+    }
+  }
+  return out
 }

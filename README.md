@@ -119,5 +119,17 @@ bun bin/brine.ts trace questions.ts answers/answers.json features/**/*.feature  
 bun bin/brine.ts followup round-2 "Did we get it right?" features/**/*.feature > round2.ts   # draft; rewrite in their words
 ```
 
-The eight steps are in `skills/brine/SKILL.md`; the markers and the step pass in
-`skills/brine/references/gherkin.md`.
+Scenarios hold behavior. Everything else the respondent said (numbers, timers, rules, their wording,
+real cases, red flags, terms, wishes, risks, what they watch) goes into one fact ledger, each fact
+cited to its answers, and every other artifact is projected from it:
+
+```sh
+bun bin/brine.ts ledger check questions.ts ledger.json answers/answers.json   # well formed, every citation a question
+bun bin/brine.ts ledger emit ledger.json number timer rule template > src/facts.gen.ts   # code reads constants by id
+bun bin/brine.ts ledger render ledger.json idea          # the backlog (risk, term, ... likewise)
+bun bin/brine.ts ledger records answers/answers.json ledger.json features/**/*.feature > answers.jsonl   # retrieval
+```
+
+The steps are in `skills/brine/SKILL.md`; the markers and the step pass in
+`skills/brine/references/gherkin.md`; the ledger's kinds, projections and checks, ranked, in
+`skills/brine/references/derivations.md`.
