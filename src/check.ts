@@ -3,6 +3,7 @@
 // branch value exists, and every question says why it is asked and what it yields.
 
 import type { Condition, Decision, Interview, Question } from "./spec"
+import { minutes, seconds } from "./estimate"
 import { answer, begin, compile, END, fallbacks, replay, resolve, type Session, type Walk } from "./walk"
 
 const KINDS = ["long", "text", "choice", "multi", "number", "scale"]
@@ -17,6 +18,7 @@ export interface Report {
     conditional: number
     decisions: number
     walks: { min: number; median: number; max: number } // sampled
+    minutes: { min: number; median: number; max: number } // the same walks, timed by kind (estimate.ts)
     byChapter: { id: string; title: string; questions: number; conditional: number }[]
   }
 }
@@ -106,8 +108,16 @@ export function check(interview: Interview, samples = 400): Report {
 
   // Sample walks with random answers and random decisions: how long is a real sitting?
   const lengths: number[] = []
-  if (!errors.length) for (let i = 0; i < samples; i++) lengths.push(replay(walk, sample(walk)).path.length)
+  const times: number[] = []
+  if (!errors.length)
+    for (let i = 0; i < samples; i++) {
+      const path = replay(walk, sample(walk)).path
+      lengths.push(path.length)
+      times.push(minutes(seconds(path.map((id) => walk.byId.get(id)!.question.kind))))
+    }
   lengths.sort((a, b) => a - b)
+  times.sort((a, b) => a - b)
+  const spread = (xs: number[]) => ({ min: xs[0] ?? 0, median: xs[Math.floor(xs.length / 2)] ?? 0, max: xs[xs.length - 1] ?? 0 })
 
   const conditional = (cid: string, q: Question) => Boolean(q.when || interview.chapters.find((c) => c.id === cid)!.when)
   const byChapter = interview.chapters.map((c) => ({ id: c.id, title: c.title, questions: c.questions.length, conditional: c.questions.filter((q) => conditional(c.id, q)).length }))
@@ -122,7 +132,8 @@ export function check(interview: Interview, samples = 400): Report {
       always: questions - cond,
       conditional: cond,
       decisions: walk.nodes.reduce((n, x) => n + Object.keys(x.question.decide ?? {}).length, 0),
-      walks: { min: lengths[0] ?? 0, median: lengths[Math.floor(lengths.length / 2)] ?? 0, max: lengths[lengths.length - 1] ?? 0 },
+      walks: spread(lengths),
+      minutes: spread(times),
       byChapter,
     },
   }

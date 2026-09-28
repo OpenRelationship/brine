@@ -3,6 +3,8 @@
 //
 //   brine check <interview.ts>            lint the question tree and print its size
 //   brine outline <interview.ts>          every question with its guard, why and yields (markdown)
+//   brine card <interview.ts> --company <name> [--out dir] [--heading …] [--body …] [--mark logo] [--font file]…
+//                                         the share card (og:image) with the time a sitting takes
 //   brine invite <url> <name>             make an invite link              (BRINE_ADMIN_TOKEN)
 //   brine passcode <url> <code> <passcode>  let that respondent in by typing a passcode on the site
 //   brine status <url>                    who is how far                    (BRINE_ADMIN_TOKEN)
@@ -18,9 +20,11 @@
 //
 // <interview.ts> exports `interview` (or a default). answers.md is what the Gherkin pass reads.
 
-import { mkdir, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
+import { card, png } from "../src/card"
 import { check } from "../src/check"
+import { duration } from "../src/estimate"
 import { followup, scan, source, trace } from "../src/loop"
 import { answerRecords, checkLedger, emitLedger, KINDS, renderLedger, type FactKind, type Ledger } from "../src/ledger"
 import type { Condition, Interview } from "../src/spec"
@@ -65,9 +69,43 @@ async function main() {
     for (const w of r.warnings) console.log(`warn   ${w}`)
     const s = r.stats
     console.log(`\n${s.chapters} chapters, ${s.questions} questions (${s.always} always, ${s.conditional} conditional), ${s.decisions} decisions`)
-    if (!r.errors.length) console.log(`a walk asks ${s.walks.min}–${s.walks.max}, median ${s.walks.median} (sampled)`)
+    if (!r.errors.length) console.log(`a walk asks ${s.walks.min}–${s.walks.max}, median ${s.walks.median} (sampled); a sitting takes ${duration(s.minutes.min, s.minutes.max)}`)
     for (const c of s.byChapter) console.log(`  ${c.id.padEnd(16)} ${String(c.questions).padStart(3)}  ${c.conditional ? `(${c.conditional} conditional)  ` : ""}${c.title}`)
     process.exit(r.errors.length ? 1 : 0)
+  }
+
+  if (cmd === "card") {
+    const flags: Record<string, string[]> = {}
+    const rest: string[] = []
+    for (let i = 0; i < args.length; i++) args[i].startsWith("--") ? (flags[args[i].slice(2)] ??= []).push(args[++i]) : rest.push(args[i])
+    const one = (k: string) => flags[k]?.[0]
+    const company = one("company")
+    if (!rest[0] || !company) throw new Error("brine card <interview.ts> --company <name> [--out dir] [--heading …] [--body …] [--mark logo.svg|png] [--font file.ttf]…")
+    const r = check(await load(rest[0]))
+    if (r.errors.length) throw new Error(`the interview does not pass check (${r.errors.length} errors); run brine check`)
+    const i = await load(rest[0])
+    const s = r.stats
+    const markFile = one("mark")
+    const mark = markFile && `data:${markFile.endsWith(".svg") ? "image/svg+xml" : "image/png"};base64,${Buffer.from(await readFile(markFile)).toString("base64")}`
+    const svg = card({
+      company,
+      heading: one("heading") ?? i.title,
+      body: one("body") ?? "An interview about how the work really gets done. Type or talk, skip anything, and stop whenever you like.",
+      time: duration(s.minutes.min, s.minutes.max),
+      questions: s.walks.min === s.walks.max ? `${s.walks.max}` : `${s.walks.min}–${s.walks.max}`,
+      note: "come back any time",
+      mark,
+    })
+    const dir = one("out") ?? "."
+    await mkdir(dir, { recursive: true })
+    await writeFile(path.join(dir, "card.svg"), svg)
+    await writeFile(path.join(dir, "card.png"), await png(svg, { fonts: flags.font }))
+    console.log(`${dir}/card.svg, ${dir}/card.png (${duration(s.minutes.min, s.minutes.max)}). In the page's <head>, with the absolute URL it is served at:
+  <meta property="og:title" content="${i.title} · ${company}" />
+  <meta property="og:image" content="https://…/card.png" />
+  <meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />`)
+    return
   }
 
   if (cmd === "outline") {
@@ -232,7 +270,7 @@ async function main() {
     return
   }
 
-  console.log(`brine check <interview.ts> | outline <interview.ts> | trace | followup | ledger check|render|emit|records | invite <url> <name> | passcode <url> <code> <passcode> | status <url> | export <url> [dir] | transcribe <url> | revoke <url> <code>`)
+  console.log(`brine check <interview.ts> | outline <interview.ts> | card <interview.ts> --company <name> | trace | followup | ledger check|render|emit|records | invite <url> <name> | passcode <url> <code> <passcode> | status <url> | export <url> [dir] | transcribe <url> | revoke <url> <code>`)
   process.exit(cmd ? 2 : 0)
 }
 
