@@ -116,6 +116,8 @@ poorly.
 
 ## The second round
 
+Often there should be none. Gaps are `open` facts in the ledger; ask only for the ones that block what is built next, batched into a few questions by text. Run a round two when the first missed a whole area or the owner wants the rules confirmed.
+
 Round two is short and mostly confirmation. Open each part of the process with a read-back: its rules
 as a bulleted list (`context` may be a list) under "Is this how it works?", with "Yes / Mostly / No"
 and a note. Follow it with that part's gaps, each rewritten from the TODO into a real question with

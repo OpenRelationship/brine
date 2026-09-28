@@ -21,7 +21,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { check } from "../src/check"
 import { followup, scan, source, trace } from "../src/loop"
-import { checkLedger, emitLedger, KINDS, renderLedger, type FactKind, type Ledger } from "../src/ledger"
+import { answerRecords, checkLedger, emitLedger, KINDS, renderLedger, type FactKind, type Ledger } from "../src/ledger"
 import type { Condition, Interview } from "../src/spec"
 
 const [cmd, ...args] = process.argv.slice(2)
@@ -147,7 +147,19 @@ async function main() {
       process.stdout.write(emitLedger((await Bun.file(ledgerFile).json()) as Ledger, ledgerFile, kinds.length ? (kinds as FactKind[]) : undefined))
       return
     }
-    throw new Error("brine ledger check|render|emit")
+    if (sub === "records") {
+      // brine ledger records <answers.json> <ledger.json|-> <features…>: JSONL, one record per answer
+      const [answersFile, ledgerFile, ...features] = rest
+      const exp = await Bun.file(answersFile).json()
+      const ledger = ledgerFile && ledgerFile !== "-" ? ((await Bun.file(ledgerFile).json()) as Ledger) : undefined
+      const scans = await Promise.all(features.map(async (f) => scan(await Bun.file(f).text(), f)))
+      const rs = answerRecords(exp, scans, ledger)
+      for (const r of rs) console.log(JSON.stringify(r))
+      const bare = rs.filter((r) => !r.scenarios.length && !r.facts.length)
+      console.error(`${rs.length} records; ${bare.length} cited by no scenario or fact${bare.length ? `: ${bare.map((r) => r.id).join(" ")}` : ""}`)
+      return
+    }
+    throw new Error("brine ledger check|render|emit|records")
   }
 
   if (cmd === "invite") {
@@ -219,7 +231,7 @@ async function main() {
     return
   }
 
-  console.log(`brine check <interview.ts> | outline <interview.ts> | invite <url> <name> | passcode <url> <code> <passcode> | status <url> | export <url> [dir] | transcribe <url> | revoke <url> <code>`)
+  console.log(`brine check <interview.ts> | outline <interview.ts> | trace | followup | ledger check|render|emit|records | invite <url> <name> | passcode <url> <code> <passcode> | status <url> | export <url> [dir] | transcribe <url> | revoke <url> <code>`)
   process.exit(cmd ? 2 : 0)
 }
 
