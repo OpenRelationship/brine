@@ -9,12 +9,15 @@
 //   brine export <url> [dir]              answers.json + answers.md         (BRINE_ADMIN_TOKEN)
 //   brine transcribe <url>                retry every recording without a transcript
 //   brine revoke <url> <code>             delete an invite, its answers and its recordings
+//   brine trace <interview.ts> <answers.json> <feature>...   @q: tags resolve; answers no scenario cites
+//   brine followup <id> <title> <feature>...                  draft round two (read-backs + TODOs) as TS
 //
 // <interview.ts> exports `interview` (or a default). answers.md is what the Gherkin pass reads.
 
 import { mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { check } from "../src/check"
+import { followup, scan, source, trace } from "../src/loop"
 import type { Condition, Interview } from "../src/spec"
 
 const [cmd, ...args] = process.argv.slice(2)
@@ -71,7 +74,7 @@ async function main() {
       if (c.when) out.push(`_only when ${describe(c.when)}_`, "")
       c.questions.forEach((q, qi) => {
         out.push(`${qi + 1}. **${q.ask}** \`${q.id}\` · ${q.kind}${q.when ? ` · _when ${describe(q.when)}_` : ""}`)
-        if (q.context) out.push(`   - context: ${q.context}`)
+        if (q.context) out.push(`   - context: ${[q.context].flat().join(" · ")}`)
         if (q.hint) out.push(`   - ways to think about it: ${[q.hint].flat().join(" · ")}`)
         if (q.options) out.push(`   - options: ${q.options.map((o) => `${o.label}${o.next ? ` → ${o.next}` : ""}`).join(" · ")}`)
         if (q.scale) out.push(`   - scale: ${q.scale.join(" · ")}`)
@@ -81,6 +84,32 @@ async function main() {
       out.push("")
     })
     console.log(out.join("\n"))
+    return
+  }
+
+  if (cmd === "trace") {
+    const [file, answersFile, ...features] = args
+    const i = await load(file)
+    const scans = await Promise.all(features.map(async (f) => scan(await Bun.file(f).text(), f)))
+    const exp = answersFile && answersFile !== "-" ? await Bun.file(answersFile).json() : { people: [] }
+    const answered: string[] = exp.people.flatMap((p: { answers: { id: string; skipped: boolean; applies: boolean }[] }) => p.answers.filter((a) => !a.skipped && a.applies).map((a) => a.id))
+    const t = trace(i, scans, [...new Set(answered)])
+    const scenarios = scans.reduce((n, s) => n + s.scenarios.length, 0)
+    console.log(`${scenarios} scenarios in ${scans.length} features cite ${Object.keys(t.cited).length} questions; ${t.untagged.length} scenarios have no @q: tag`)
+    for (const u of t.unknown) console.log(`UNKNOWN  ${u.path}:${u.line}  @q:${u.id}`)
+    for (const u of t.untagged) console.log(`untagged ${u.path}:${u.line}  ${u.name}`)
+    if (answered.length) console.log(`${t.uncited.length} answered questions no scenario cites:\n${t.uncited.map((x) => `  ${x}`).join("\n")}`)
+    process.exit(t.unknown.length ? 1 : 0)
+  }
+
+  if (cmd === "followup") {
+    const [id, title, ...features] = args
+    const scans = await Promise.all(features.map(async (f) => scan(await Bun.file(f).text(), f)))
+    const f = followup(scans, { id, title })
+    const n = f.interview.chapters.reduce((k, c) => k + c.questions.length, 0)
+    console.log(source(f.interview))
+    console.error(`${f.interview.chapters.length} chapters, ${n} draft questions. Conflicts are rulings for the owner, not questions:`)
+    for (const c of f.conflicts) console.error(`  ${c.path}:${c.line}  ${c.text}`)
     return
   }
 
