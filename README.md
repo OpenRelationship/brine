@@ -16,16 +16,20 @@ answers come back as a bundle that Claude turns into `.feature` files.
 - **The page** (`src/ui`). One question at a time with a chapter list to jump around, and a waveform
   button in the answer box that records. The respondent never sees transcripts, reasons, branches or
   Gherkin.
-- **The Worker** (`src/worker.ts`). A dependency-free Cloudflare Worker: invite links, the walk in
-  KV, recordings in R2, transcription through OpenRouter's speech-to-text endpoint
+- **The Worker** (`src/worker.ts`). A dependency-free Cloudflare Worker: invite links and passcodes,
+  each respondent's walk in its own Durable Object, recordings and an append-only answer log in R2, transcription through OpenRouter's speech-to-text endpoint
   (`openai/gpt-4o-mini-transcribe` by default), decisions through OpenRouter's Decisions API, and an
   admin export.
 - **The loop** (`src/loop.ts`). What happens after the first round: `brine trace` ties every
   as-is scenario back to the answers it came from (`@q:` tags) and lists answers nothing cites;
   `brine followup` drafts the second round from the features' Rules (read-backs) and `# TODO`s.
-- **The skill** (`skills/brine`). A Claude Code skill: how to design the questions from a vocabulary
-  or pipeline (`references/method.md`), and how to write Gherkin from the answers
-  (`references/gherkin.md`).
+- **The ledger** (`src/ledger.ts`). Everything the respondent said that is not behavior (numbers,
+  timers, rules, their wording, stories, signals, terms, ideas, risks, metrics) as typed facts cited
+  to answers; `brine ledger check|render|emit|records` projects it into code, documents and
+  retrieval records.
+- **The skill** (`skills/brine`). An agent skill: how to design the questions from a vocabulary or
+  pipeline (`references/method.md`), how to write Gherkin from the answers
+  (`references/gherkin.md`), and what else the answers become (`references/derivations.md`).
 
 ## Use it
 
@@ -36,13 +40,15 @@ bun bin/brine.ts check example/src/interview.ts
 bun bin/brine.ts outline example/src/interview.ts
 ```
 
-Install the skill for Claude Code:
+Install the skill for your agent (Claude Code, Cursor, Codex and others) from
+[skills.sh](https://skills.sh/shinyobjectz/brine):
 
 ```sh
-ln -s ~/brine/skills/brine ~/.claude/skills/brine
+npx skills add shinyobjectz/brine
 ```
 
-Then ask Claude to "design a brine interview for <who> about <what>".
+Then ask the agent to "design a brine interview for <who> about <what>". The skill tells it to clone
+this repo for the code.
 
 ### Host an interview
 
@@ -52,7 +58,9 @@ Write `questions.ts` exporting `interview: Interview`, then:
 // worker.ts
 import { brine } from "brine/worker"
 import { interview } from "./questions"
-export default brine(interview)
+const app = brine(interview)
+export default app
+export const BrineSession = app.BrineSession   // one Durable Object per respondent
 ```
 
 ```tsx
@@ -63,7 +71,9 @@ createRoot(document.getElementById("root")!).render(<Brine interview={interview}
 ```
 
 `example/` is a complete app. It needs a KV namespace (`BRINE`), an R2 bucket (`BRINE_AUDIO`), and
-two secrets: `OPENROUTER_API_KEY` and `BRINE_ADMIN_TOKEN`.
+two secrets: `OPENROUTER_API_KEY` and `BRINE_ADMIN_TOKEN`. The Durable Object (`BRINE_SESSIONS`) and
+the passcode rate limit (`BRINE_ENTER_LIMIT`) are declared in `example/wrangler.jsonc`; both are
+optional.
 
 ```sh
 wrangler kv namespace create BRINE           # put the id in wrangler.jsonc
@@ -133,3 +143,7 @@ bun bin/brine.ts ledger records answers/answers.json ledger.json features/**/*.f
 The steps are in `skills/brine/SKILL.md`; the markers and the step pass in
 `skills/brine/references/gherkin.md`; the ledger's kinds, projections and checks, ranked, in
 `skills/brine/references/derivations.md`.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).

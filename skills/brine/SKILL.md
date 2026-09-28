@@ -1,28 +1,60 @@
 ---
 name: brine
-description: Design, host and harvest a process interview whose answers become Gherkin. Use when the user wants to learn how a client, prospect or expert actually runs their work (a pipeline, an operation, a trade) by sending them a long questionnaire, when they say "brine", "interview questionnaire", "question tree", "turn answers into Gherkin", or want voice answers transcribed and branched on. Covers designing the questions from a vocabulary or pipeline, authoring the tree, deploying it on Cloudflare, inviting the respondent, exporting answers, and writing the .feature files.
+description: Design, host and harvest a process interview whose answers become Gherkin specs and a fact ledger. Use when the user wants to learn how a client, prospect or expert actually runs their work (a pipeline, an operation, a trade) by sending them a long questionnaire, when they say "brine", "interview questionnaire", "question tree", "turn answers into Gherkin", or want voice answers transcribed and branched on. Covers designing the questions from a vocabulary or pipeline, authoring the tree, deploying it on Cloudflare, inviting the respondent, exporting answers, writing the .feature files, and projecting the answers into typed constants, timers, templates, fixtures, a backlog and a risk register.
 ---
 
 # brine: interviews in, Gherkin out
 
-brine is three things in one repo:
+brine is five things in one repo (https://github.com/shinyobjectz/brine, Apache-2.0):
 
-1. **A question tree** (`src/spec.ts`, `src/walk.ts`): chapters of questions walked in order. `when` guards skip what does not apply, `next` jumps leave early, and `decide` asks Jev (`typesafe/jev-1.13`, OpenRouter's Decisions API) typed questions about a free answer so later guards can branch on what was said.
+1. **A question tree** (`src/spec.ts`, `src/walk.ts`): chapters of questions walked in order. `when` guards skip what does not apply, `next` jumps leave early, and `decide` asks a decision model (default `typesafe/jev-1.13` through OpenRouter) typed questions about a free answer so later guards can branch on what was said.
 2. **A respondent page** (`src/ui`): one question at a time, typed or spoken. The waveform button in the answer box records; the recording is transcribed on the server by a speech-to-text model and never shown back.
-3. **A Worker** (`src/worker.ts`): invite links, the walk, recordings in R2, transcripts and decisions in KV, and an admin export.
-4. **The loop** (`src/loop.ts`): `brine trace` ties as-is Gherkin back to the answers; `brine followup` drafts the second round from what is still open.
+3. **A Worker** (`src/worker.ts`): invite links and passcodes, each respondent's walk in its own Durable Object, recordings and an append-only answer log in R2, transcripts and decisions in KV, and an admin export.
+4. **The loop** (`src/loop.ts`): `brine trace` ties as-is Gherkin back to the answers; `brine followup` drafts a second round from what is still open.
 5. **The fact ledger** (`src/ledger.ts`): everything that is not behavior (numbers, timers, rules, wording, stories, signals, terms, ideas, risks, metrics) as typed facts cited to answers; `brine ledger check|render|emit|records` projects it into code, documents and retrieval records.
 
 The respondent never sees Gherkin, reasons or branch logic. Gherkin is written afterwards, by you, from the export.
 
-The repo lives at `~/brine` (github.com/shinyobjectz/brine). Read `references/method.md` before designing questions, `references/gherkin.md` before writing features, and `references/derivations.md` before writing the ledger. They are short and they are the point of this skill.
+Read `references/method.md` before designing questions, `references/gherkin.md` before writing features, and `references/derivations.md` before writing the ledger. They are short and they are the point of this skill.
+
+## Getting brine
+
+This skill is the method; the code lives in the repo. Before running any `brine` command, find a checkout (look for a directory with `bin/brine.ts` and `src/walk.ts`, e.g. `~/brine` or a `brine` submodule in the user's project). If there is none, clone it and install:
+
+```sh
+git clone https://github.com/shinyobjectz/brine ~/brine
+cd ~/brine && bun install && bun test
+```
+
+It needs [Bun](https://bun.sh). Hosting needs a Cloudflare account and `wrangler`, and transcription and decisions need an OpenRouter key; ask the user before creating Cloudflare resources or setting secrets. In a project, add the repo as a git submodule (or a dependency) and resolve `brine/*` to its `src/*` with a Vite alias and a tsconfig path; `example/` in the repo is a complete app to copy.
+
+### Commands
+
+Run as `bun <brine>/bin/brine.ts <command>`. Commands that take a URL need `BRINE_ADMIN_TOKEN` in the environment.
+
+| Command | Does |
+| --- | --- |
+| `check <interview.ts>` | lint the tree (addresses resolve, jumps go forward, guards look back) and estimate a sitting's length |
+| `outline <interview.ts>` | every question with its guard, why and yields, as markdown to show the user |
+| `invite <url> <name>` | make an invite link for a respondent |
+| `passcode <url> <code> <passcode>` | let that respondent in by typing a passcode on the bare site |
+| `status <url>` | who is how far |
+| `transcribe <url>` | retry every recording without a transcript |
+| `export <url> [dir]` | write `answers.json` and `answers.md` |
+| `revoke <url> <code>` | delete an invite, its answers and its recordings |
+| `trace <interview.ts> <answers.json> <features…>` | every `@q:` tag resolves; lists answers no scenario cites |
+| `followup <id> <title> <features…>` | draft a second round (read-backs and TODOs) as a TS module |
+| `ledger check <interview.ts> <ledger.json> [answers.json]` | every fact typed and cited |
+| `ledger render <ledger.json> [kinds…]` | the facts as markdown, by kind |
+| `ledger emit <ledger.json> [kinds…]` | the facts as a typed TS module for code |
+| `ledger records <answers.json> <ledger.json\|-> <features…>` | one JSONL retrieval record per answer |
 
 ## The workflow
 
 An interview is a loop, not a form. The first round finds the process; the loop turns it into specs (behavior) and a fact ledger (everything else) that every other artifact is projected from. Stop early and you ship guesses.
 
 1. **Frame.** Ask the user who the respondent is, what the answers are for, and what the vocabulary is (an ontology, a glossary, a pipeline, a brief). Read the sources. Write down the known contradictions. If the host repo has a vocabulary tool (e.g. `monty onto check`), use the repo's words in `why` and `yields`.
-2. **First round.** Plan the chapters from the process, in the order work flows (`references/method.md`), show the user the chapter list with a budget, write the tree (`ask`, `context`, `hint`, `why`, `yields`; see `example/src/interview.ts`), `brine check` it, host it (see "Hosting"), invite (`brine invite`), watch (`brine status`), and harvest (`brine transcribe`, then `brine export <url> <dir>`).
+2. **First round.** Plan the chapters from the process, in the order work flows (`references/method.md`), show the user the chapter list with a budget, write the tree (`ask`, `context`, `hint`, `why`, `yields`; see `example/src/interview.ts` in the repo), `brine check` it, host it (see "Hosting"), invite (`brine invite`), watch (`brine status`), and harvest (`brine transcribe`, then `brine export <url> <dir>`).
 3. **As-is Gherkin.** From `answers.md`, following `references/gherkin.md`: one feature per chapter, the respondent's words, `# TODO:` for every gap, `# IDEA:` for wishes, `# CONFLICT:` where answers disagree with each other or the documents. Tag every scenario (or the Feature line, for its description and notes) with the questions it came from: `@q:<chapter>/<question>`. Then `brine trace <interview.ts> answers.json <features…>` must show no unknown tags and no answered question left uncited.
 4. **Fact ledger.** With the transcript open, walk every answer again for what is not behavior and write it to `ledger.json` as typed facts, each citing its questions (`references/derivations.md`). Never invent a value: vague or disputed becomes `status: "open"` with the quote. `brine ledger check <interview.ts> ledger.json answers.json` must pass.
 5. **Rulings.** Each `# CONFLICT:` and each blocking `open` fact is a decision for whoever owns it (usually the user), asked as one question with a recommendation. Record the answer as `# RULED: <ruling> (<who>, <date>)` under the conflict and as `status: "ruled"` on the fact, and update the vocabulary. A ruled conflict is settled; `brine followup` stops listing it.
@@ -40,7 +72,9 @@ The consumer app is two files around your interview module:
 // worker.ts: the Worker's entry
 import { brine } from "brine/worker"
 import { interview } from "./questions"
-export default brine(interview)
+const app = brine(interview)
+export default app
+export const BrineSession = app.BrineSession // one Durable Object per respondent
 ```
 
 ```tsx
@@ -50,7 +84,7 @@ import "brine/ui/brine.css"
 createRoot(root).render(<Brine interview={interview} brand={{ name: "Acme", mark: <img src="/mark.svg" alt="" /> }} />)
 ```
 
-Theme it by setting the `--brine-*` custom properties on `.brine` after importing the CSS (see the top of `src/ui/brine.css`). `wrangler.jsonc` needs static assets with `run_worker_first: ["/api/*"]`, a KV binding `BRINE` and an R2 binding `BRINE_AUDIO`; `example/wrangler.jsonc` is a template. Resolve `brine/*` to `~/brine/src/*` (a git submodule, a Vite alias and a tsconfig path), or install the repo as a dependency.
+Theme it by setting the `--brine-*` custom properties on `.brine` after importing the CSS (see the top of `src/ui/brine.css`). `wrangler.jsonc` needs static assets with `run_worker_first: ["/api/*"]`, a KV binding `BRINE` and an R2 binding `BRINE_AUDIO`, and should have the Durable Object binding `BRINE_SESSIONS` (class `BrineSession`; without it walks fall back to KV and one device) and a rate limit `BRINE_ENTER_LIMIT` for passcode tries. `example/wrangler.jsonc` is a template. Secrets: `OPENROUTER_API_KEY` and `BRINE_ADMIN_TOKEN`.
 
 Models are vars: `BRINE_STT_MODEL` (default `openai/gpt-4o-mini-transcribe`; `openai/whisper-1` and `google/gemini-3.5-transcribe` also take browser WebM and Safari MP4) and `BRINE_DECIDE_MODEL` (default `typesafe/jev-1.13`). Without a key the page still works: recordings are kept, and every decision takes its `fallback`.
 
