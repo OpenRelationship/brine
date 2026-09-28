@@ -55,8 +55,9 @@ export interface Question {
   kind: Kind
   ask: string
   // Shown under the question: one or two plain sentences that set the scene (where we are in the
-  // process, what "this" refers to) so the question makes sense on its own.
-  context?: string
+  // process, what "this" refers to) so the question makes sense on its own. A list renders as
+  // bullets: a read-back shows the rules it asks the respondent to confirm.
+  context?: string | string[]
   // Shown at the bottom as "Ways to think about it": prompts for when the answer isn't top of
   // mind (what a good answer might cover, angles, examples). Never the answer itself.
   hint?: string | string[]

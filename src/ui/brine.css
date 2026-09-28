@@ -443,6 +443,15 @@
   margin: 0 0 6px;
   text-wrap: pretty;
 }
+.brine-readback {
+  list-style: disc;
+  padding-left: 1.25em;
+  margin-bottom: 20px;
+}
+.brine-readback li {
+  margin: 0 0 8px;
+  padding-left: 2px;
+}
 .brine-revisit {
   font-size: 0.875rem;
   color: var(--brine-soft);

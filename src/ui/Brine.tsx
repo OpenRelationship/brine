@@ -629,7 +629,14 @@ function Ask({
     <section className="brine-question">
       {revisiting && <p className="brine-revisit">{saved ? "An earlier answer. Change anything; it's saved when you leave." : "You've skipped ahead to this one."}</p>}
       <h1>{q.ask}</h1>
-      {q.context && <p className="brine-context">{q.context}</p>}
+      {typeof q.context === "string" && <p className="brine-context">{q.context}</p>}
+      {Array.isArray(q.context) && (
+        <ul className="brine-context brine-readback">
+          {q.context.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      )}
 
       {q.kind === "long" && box("Type here, or press Talk and just say it.", "value")}
 
