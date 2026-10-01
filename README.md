@@ -2,7 +2,7 @@
 
 # brine
 
-[![skills.sh](https://skills.sh/b/shinyobjectz/brine)](https://skills.sh/shinyobjectz/brine) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![skills.sh](https://skills.sh/b/OpenRelationship/brine)](https://skills.sh/OpenRelationship/brine) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 Model the behavior before you build it.
 
@@ -75,10 +75,10 @@ bun bin/brine.ts outline example/src/interview.ts
 ```
 
 Install the skill for your agent (Claude Code, Cursor, Codex and others) from
-[skills.sh](https://skills.sh/shinyobjectz/brine):
+[skills.sh](https://skills.sh/OpenRelationship/brine):
 
 ```sh
-npx skills add shinyobjectz/brine
+npx skills add OpenRelationship/brine
 ```
 
 Then ask the agent to "design a brine interview for <who> about <what>". The skill tells it to clone

@@ -4,8 +4,8 @@
   "description": "Model the behavior before you build it: interview the people who do the work with a voice question tree, then turn the answers into Gherkin specs and a typed fact ledger for planning apps and internal tools.",
   "type": "module",
   "license": "Apache-2.0",
-  "repository": { "type": "git", "url": "git+https://github.com/shinyobjectz/brine.git" },
-  "homepage": "https://github.com/shinyobjectz/brine",
+  "repository": { "type": "git", "url": "git+https://github.com/OpenRelationship/brine.git" },
+  "homepage": "https://github.com/OpenRelationship/brine",
   "keywords": ["behavior-modeling", "requirements", "product-planning", "ai-agents", "interview", "gherkin", "bdd", "cloudflare-workers", "agent-skill"],
   "bin": { "brine": "./bin/brine.ts" },
   "exports": {

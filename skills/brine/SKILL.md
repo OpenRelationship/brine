@@ -11,7 +11,7 @@ Plan software from how the work actually happens, not from what people say they 
 - **An app around a customer, client or user.** Model their process first: the states a record moves through, the clocks behind reminders, the messages they send, the exceptions they handle by hand.
 - **A specialist's process**, such as an estimator pricing a job or a payroll lead closing the month, written down in their own words so the team and its software work to the same spec.
 
-brine is five things in one repo (https://github.com/shinyobjectz/brine, Apache-2.0):
+brine is five things in one repo (https://github.com/OpenRelationship/brine, Apache-2.0):
 
 1. **A question tree** (`src/spec.ts`, `src/walk.ts`): chapters of questions walked in order. `when` guards skip what does not apply, `next` jumps leave early, and `decide` asks a decision model (default `typesafe/jev-1.13` through OpenRouter) typed questions about a free answer so later guards can branch on what was said.
 2. **A respondent page** (`src/ui`): one question at a time, typed or spoken. The waveform button in the answer box records; the recording is transcribed on the server by a speech-to-text model and never shown back.
@@ -28,7 +28,7 @@ Read `references/method.md` before designing questions, `references/gherkin.md` 
 This skill is the method; the code lives in the repo. Before running any `brine` command, find a checkout (look for a directory with `bin/brine.ts` and `src/walk.ts`, e.g. `~/brine` or a `brine` submodule in the user's project). If there is none, clone it and install:
 
 ```sh
-git clone https://github.com/shinyobjectz/brine ~/brine
+git clone https://github.com/OpenRelationship/brine ~/brine
 cd ~/brine && bun install && bun test
 ```
 
